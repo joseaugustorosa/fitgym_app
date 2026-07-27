@@ -16,6 +16,8 @@ interface FoodPickerSheetProps {
   confirming?: boolean
 }
 
+const SUGGESTIONS = ['Frango grelhado', 'Arroz branco', 'Ovo cozido', 'Banana', 'Whey']
+
 export function FoodPickerSheet({
   open,
   onClose,
@@ -32,9 +34,15 @@ export function FoodPickerSheet({
   const [searched, setSearched] = useState(false)
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setQuery('')
+      setSelected(null)
+      setError('')
+      setSearched(false)
+      setGrams(100)
+      return
+    }
     document.body.style.overflow = 'hidden'
-    // carrega sugestões iniciais do catálogo
     void runSearch('')
     return () => {
       document.body.style.overflow = ''
@@ -45,7 +53,7 @@ export function FoodPickerSheet({
     if (!open || selected) return
     const t = setTimeout(() => {
       void runSearch(query)
-    }, 350)
+    }, 320)
     return () => clearTimeout(t)
   }, [query, open, selected])
 
@@ -87,6 +95,7 @@ export function FoodPickerSheet({
   }
 
   const portion = selected ? portionFromFood(selected, grams) : null
+  const step = selected ? 2 : 1
 
   return (
     <>
@@ -111,9 +120,11 @@ export function FoodPickerSheet({
           <div className="flex items-start justify-between gap-3 px-4 pt-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
-                Alimentação
+                Passo {step} de 2
               </p>
-              <h2 className="mt-1 text-xl font-bold">O que você comeu?</h2>
+              <h2 className="mt-1 text-xl font-bold">
+                {selected ? 'Quanto você comeu?' : 'O que você comeu?'}
+              </h2>
             </div>
             <button
               onClick={onClose}
@@ -124,18 +135,42 @@ export function FoodPickerSheet({
             </button>
           </div>
 
+          <div className="mx-4 mt-3 flex gap-2">
+            <div className={`h-1 flex-1 rounded-full ${step >= 1 ? 'bg-brand' : 'bg-surface-3'}`} />
+            <div className={`h-1 flex-1 rounded-full ${step >= 2 ? 'bg-brand' : 'bg-surface-3'}`} />
+          </div>
+
           <div className="px-4 py-4">
             {!selected ? (
               <>
-                <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Ex: frango grelhado, arroz, banana…"
-                  className="field-sexy mt-0"
-                  autoFocus
-                />
-                <p className="mt-2 text-[11px] text-neutral-500">
-                  Busca no catálogo FitGym e na base Open Food Facts. Se não achar, use a IA.
+                <label className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-neutral-500">
+                  Digite ou escolha
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Ex: frango grelhado, arroz…"
+                    className="field-sexy"
+                    autoFocus
+                  />
+                </label>
+
+                {!query.trim() && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {SUGGESTIONS.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setQuery(s)}
+                        className="pressable rounded-full bg-surface-3 px-3 py-1.5 text-xs font-semibold text-neutral-200"
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-3 text-[11px] leading-relaxed text-neutral-500">
+                  1) Catálogo FitGym → 2) Open Food Facts → 3) Se não achar, estime com IA
                 </p>
 
                 {error && (
@@ -146,7 +181,7 @@ export function FoodPickerSheet({
 
                 <div className="mt-3 flex flex-col gap-2">
                   {searching && (
-                    <p className="text-sm text-neutral-400">Buscando alimentos…</p>
+                    <p className="py-4 text-center text-sm text-neutral-400">Buscando…</p>
                   )}
                   {!searching &&
                     results.map((food) => (
@@ -163,23 +198,27 @@ export function FoodPickerSheet({
                             className="h-12 w-12 rounded-xl object-cover"
                           />
                         ) : (
-                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 text-xs font-bold text-brand">
-                            {food.source === 'ai' ? 'IA' : 'OK'}
+                          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand/15 text-[10px] font-bold text-brand">
+                            {food.source === 'catalog' ? 'FG' : food.source === 'ai' ? 'IA' : 'OFF'}
                           </div>
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-semibold">{food.name}</p>
                           <p className="text-xs text-neutral-400">
                             {food.caloriesPer100g} kcal/100g
-                            {food.brand ? ` · ${food.brand}` : ''} · {foodSourceLabel(food.source)}
+                            {food.brand ? ` · ${food.brand}` : ''}
+                          </p>
+                          <p className="text-[10px] text-neutral-500">
+                            {foodSourceLabel(food.source)}
                           </p>
                         </div>
+                        <span className="text-xs font-bold text-brand">Escolher</span>
                       </button>
                     ))}
                   {!searching && results.length === 0 && searched && (
                     <div className="rounded-2xl border border-brand/20 bg-brand/10 p-4">
                       <p className="text-sm text-neutral-200">
-                        Não encontramos “{query}” na base de comidas.
+                        Não achamos “{query}” na base.
                       </p>
                       <button
                         type="button"
@@ -187,7 +226,7 @@ export function FoodPickerSheet({
                         disabled={estimating}
                         className="pressable mt-3 w-full rounded-xl bg-brand py-3 text-sm font-bold text-white disabled:opacity-60"
                       >
-                        {estimating ? 'Consultando IA…' : 'Estimar com IA'}
+                        {estimating ? 'Consultando IA…' : 'Estimar calorias com IA'}
                       </button>
                     </div>
                   )}
@@ -200,7 +239,7 @@ export function FoodPickerSheet({
                     disabled={estimating}
                     className="mt-3 w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-neutral-300 disabled:opacity-60"
                   >
-                    {estimating ? 'Consultando IA…' : 'Não achei — estimar com IA'}
+                    {estimating ? 'Consultando IA…' : 'Não achei na lista — usar IA'}
                   </button>
                 )}
               </>
@@ -221,7 +260,7 @@ export function FoodPickerSheet({
                 </div>
 
                 <label className="mt-4 block text-xs font-medium uppercase tracking-[0.12em] text-neutral-500">
-                  Quantidade (gramas)
+                  Quantidade em gramas
                   <input
                     type="number"
                     min={1}
@@ -233,35 +272,46 @@ export function FoodPickerSheet({
                 </label>
 
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {[50, 100, 150, 200, selected.defaultGrams].filter(
-                    (v, i, a) => a.indexOf(v) === i,
-                  ).map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setGrams(g)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
-                        grams === g ? 'bg-brand text-white' : 'bg-surface-3 text-neutral-300'
-                      }`}
-                    >
-                      {g}g
-                    </button>
-                  ))}
+                  {[
+                    { g: 50, label: '50g' },
+                    { g: 100, label: '100g' },
+                    { g: 150, label: '150g' },
+                    { g: 200, label: '200g' },
+                    { g: selected.defaultGrams, label: `${selected.defaultGrams}g` },
+                  ]
+                    .filter((v, i, a) => a.findIndex((x) => x.g === v.g) === i)
+                    .map(({ g, label }) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setGrams(g)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                          grams === g ? 'bg-brand text-white' : 'bg-surface-3 text-neutral-300'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                 </div>
 
                 {portion && (
-                  <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-                    {[
-                      { label: 'kcal', value: portion.calories },
-                      { label: 'P', value: `${portion.protein}g` },
-                      { label: 'C', value: `${portion.carbs}g` },
-                      { label: 'G', value: `${portion.fat}g` },
-                    ].map((s) => (
-                      <div key={s.label} className="rounded-xl bg-surface-3 p-2">
-                        <p className="text-[10px] text-neutral-500">{s.label}</p>
-                        <p className="font-bold text-brand">{s.value}</p>
-                      </div>
-                    ))}
+                  <div className="mt-4 rounded-2xl border border-brand/20 bg-brand/10 p-3">
+                    <p className="text-center text-[11px] font-semibold uppercase tracking-wider text-brand">
+                      Nesta porção
+                    </p>
+                    <div className="mt-2 grid grid-cols-4 gap-2 text-center">
+                      {[
+                        { label: 'kcal', value: portion.calories },
+                        { label: 'Prot', value: `${portion.protein}g` },
+                        { label: 'Carb', value: `${portion.carbs}g` },
+                        { label: 'Gord', value: `${portion.fat}g` },
+                      ].map((s) => (
+                        <div key={s.label}>
+                          <p className="text-[10px] text-neutral-400">{s.label}</p>
+                          <p className="font-bold text-white">{s.value}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -271,7 +321,7 @@ export function FoodPickerSheet({
                   onClick={() => portion && onConfirm(portion)}
                   className="pressable mt-4 w-full rounded-2xl bg-brand py-3.5 font-bold text-white disabled:opacity-50"
                 >
-                  {confirming ? 'Salvando…' : 'Adicionar à dieta'}
+                  {confirming ? 'Salvando…' : `Confirmar · +${portion?.calories ?? 0} kcal`}
                 </button>
               </>
             )}
