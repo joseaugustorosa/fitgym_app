@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { MealPhotoSheet } from '../../components/MealPhotoSheet'
+import { FoodPickerSheet } from '../../components/FoodPickerSheet'
 import { compressImageFile } from '../../lib/image'
 import { todayKey } from '../../lib/dates'
 import {
@@ -17,6 +18,7 @@ import {
 } from '../../services/api'
 import { analyzeMealPhotoWithGeminiKey, hasGeminiBrowserKey } from '../../services/mealAi'
 import { isFirebaseConfigured } from '../../lib/firebase'
+import type { FoodPortion } from '../../services/foodApi'
 import type { MealAnalysisResult, MealPlan, MealScan, WaterLog } from '../../types'
 
 export function DietaPage() {
@@ -34,6 +36,8 @@ export function DietaPage() {
   const [analysis, setAnalysis] = useState<MealAnalysisResult | null>(null)
   const [scanError, setScanError] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [foodPickerOpen, setFoodPickerOpen] = useState(false)
+  const [savingFood, setSavingFood] = useState(false)
 
   async function reloadScans(uid: string) {
     const list = await listMealScans(uid)
@@ -180,6 +184,35 @@ export function DietaPage() {
     setScans((prev) => prev.filter((s) => s.id !== id))
   }
 
+  async function addFoodPortion(portion: FoodPortion) {
+    if (!profile) return
+    setSavingFood(true)
+    try {
+      const saved = await saveMealScan({
+        userId: profile.uid,
+        date: todayKey(),
+        title: `${portion.food.name} (${portion.grams}g)`,
+        calories: portion.calories,
+        protein: portion.protein,
+        carbs: portion.carbs,
+        fat: portion.fat,
+        items: [portion.food.name, `${portion.grams}g`, portion.food.source],
+        confidence: portion.food.source === 'ai' ? 0.6 : 0.95,
+        notes:
+          portion.food.source === 'openfoodfacts'
+            ? 'Dados Open Food Facts'
+            : portion.food.source === 'catalog'
+              ? 'Catálogo FitGym'
+              : 'Estimativa por IA',
+        previewUrl: portion.food.imageUrl ?? null,
+      })
+      setScans((prev) => [saved, ...prev])
+      setFoodPickerOpen(false)
+    } finally {
+      setSavingFood(false)
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-5 px-4 pb-6">
@@ -195,23 +228,31 @@ export function DietaPage() {
         </header>
 
         <button
-          onClick={openCamera}
+          onClick={() => setFoodPickerOpen(true)}
           className="pressable hero-checkin relative overflow-hidden rounded-3xl p-5 text-left"
         >
           <div className="relative z-10">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
-              Nova função
+              Registrar comida
             </p>
-            <h2 className="font-display mt-2 text-2xl font-extrabold text-white">
-              Fotografar refeição
-            </h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">O que você comeu?</h2>
             <p className="mt-1 text-sm text-white/80">
-              Tire uma foto do prato e a IA estima as calorias
+              Busque na base de alimentos ou estime com IA
             </p>
             <span className="mt-4 inline-flex rounded-2xl bg-white px-4 py-2.5 text-sm font-bold text-brand-dark">
-              Abrir câmera
+              Escolher alimento
             </span>
           </div>
+        </button>
+
+        <button
+          onClick={openCamera}
+          className="pressable glass-panel rounded-3xl p-4 text-left"
+        >
+          <p className="font-semibold text-brand">Ou fotografar o prato</p>
+          <p className="mt-1 text-sm text-neutral-400">
+            A IA analisa a foto e estima as calorias
+          </p>
         </button>
 
         <input
@@ -455,6 +496,13 @@ export function DietaPage() {
         }}
         onChange={setAnalysis}
         onConfirm={() => void confirmScan()}
+      />
+
+      <FoodPickerSheet
+        open={foodPickerOpen}
+        confirming={savingFood}
+        onClose={() => setFoodPickerOpen(false)}
+        onConfirm={(portion) => void addFoodPortion(portion)}
       />
     </>
   )

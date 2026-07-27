@@ -6,6 +6,7 @@ interface LocalData {
   workoutProgress: Record<string, { planId: string; completedExerciseIds: string[] }>
   mealEaten: Record<string, string[]>
   water: Record<string, number>
+  checkIns: Record<string, string[]> // userId -> dates
   mealScans: MealScan[]
   posts: Post[]
   likes: Record<string, string[]>
@@ -17,6 +18,7 @@ const empty = (): LocalData => ({
   workoutProgress: {},
   mealEaten: {},
   water: {},
+  checkIns: {},
   mealScans: [],
   posts: [],
   likes: {},
@@ -66,6 +68,21 @@ export const localStore = {
     const data = read()
     data.water[`${userId}_${date}`] = liters
     write(data)
+  },
+  hasCheckIn(userId: string, date: string) {
+    return (read().checkIns[userId] ?? []).includes(date)
+  },
+  listCheckInDates(userId: string) {
+    return read().checkIns[userId] ?? []
+  },
+  addCheckIn(userId: string, date: string) {
+    const data = read()
+    const set = new Set(data.checkIns[userId] ?? [])
+    if (set.has(date)) return false
+    set.add(date)
+    data.checkIns[userId] = [...set]
+    write(data)
+    return true
   },
   listMealScans(userId: string, date: string) {
     return read().mealScans.filter((s) => s.userId === userId && s.date === date)

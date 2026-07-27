@@ -194,3 +194,123 @@ body::before {
   border-color: rgba(255, 90, 0, 0.7);
   background: rgba(255, 90, 0, 0.06);
 }
+
+.home-ring-progress {
+  transition: stroke-dashoffset 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes home-cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0);
+  }
+}
+
+.home-cta-pulse {
+  animation: home-cta-pulse 2.2s ease-out infinite;
+}
+
+@keyframes home-flame {
+  0%,
+  100% {
+    transform: scale(1) rotate(-2deg);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    transform: scale(1.18) rotate(3deg);
+    filter: drop-shadow(0 0 8px rgba(255, 90, 0, 0.55));
+  }
+}
+
+.home-flame {
+  animation: home-flame 0.9s ease-in-out 3;
+  transform-origin: center bottom;
+}
+
+@keyframes home-day-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.home-day-pop {
+  animation: home-day-pop 450ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes home-burst-fly {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+  }
+}
+
+.home-burst {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #fff;
+  animation: home-burst-fly 900ms ease-out forwards;
+}
+
+.home-burst-1 {
+  --dx: -70px;
+  --dy: -90px;
+  background: #fff;
+  animation-delay: 0ms;
+}
+.home-burst-2 {
+  --dx: 80px;
+  --dy: -70px;
+  background: #ffe0c2;
+  animation-delay: 40ms;
+}
+.home-burst-3 {
+  --dx: -90px;
+  --dy: 20px;
+  background: #ffb380;
+  animation-delay: 80ms;
+}
+.home-burst-4 {
+  --dx: 95px;
+  --dy: 30px;
+  background: #fff;
+  animation-delay: 60ms;
+}
+.home-burst-5 {
+  --dx: 10px;
+  --dy: -110px;
+  background: #ffd4a8;
+  animation-delay: 20ms;
+}
+.home-burst-6 {
+  --dx: -40px;
+  --dy: 70px;
+  background: #fff;
+  animation-delay: 100ms;
+}
+.home-burst-7 {
+  --dx: 50px;
+  --dy: 80px;
+  background: #ffc999;
+  animation-delay: 50ms;
+}
+
+.home-celebrate {
+  animation: brand-pulse 0.6s ease-out 2;
+}

@@ -142,11 +142,30 @@ function yesterdayOf(d: Date): Date {
   return y
 }
 
+function nextStreak(user: UserProfile, now: Date): number {
+  let streakDays = 1
+  if (user.lastCheckInAt) {
+    const last = new Date(user.lastCheckInAt)
+    if (sameDay(last, yesterdayOf(now))) streakDays = user.streakDays + 1
+    else if (sameDay(last, now)) streakDays = user.streakDays
+  }
+  return streakDays
+}
+
 export async function doCheckIn(user: UserProfile): Promise<UserProfile> {
-  const db = requireDb()
   const now = new Date()
   const today = todayKey(now)
 
+  if (useLocal(user.uid)) {
+    if (localStore.hasCheckIn(user.uid, today)) {
+      throw new Error('Você já fez check-in hoje')
+    }
+    localStore.addCheckIn(user.uid, today)
+    const createdAt = now.toISOString()
+    return { ...user, lastCheckInAt: createdAt, streakDays: nextStreak(user, now) }
+  }
+
+  const db = requireDb()
   const existing = await getDocs(
     query(
       collection(db, 'checkIns'),
@@ -159,13 +178,7 @@ export async function doCheckIn(user: UserProfile): Promise<UserProfile> {
     throw new Error('Você já fez check-in hoje')
   }
 
-  let streakDays = 1
-  if (user.lastCheckInAt) {
-    const last = new Date(user.lastCheckInAt)
-    if (sameDay(last, yesterdayOf(now))) streakDays = user.streakDays + 1
-    else if (sameDay(last, now)) streakDays = user.streakDays
-  }
-
+  const streakDays = nextStreak(user, now)
   const createdAt = now.toISOString()
   await addDoc(collection(db, 'checkIns'), {
     userId: user.uid,
@@ -183,13 +196,17 @@ export async function doCheckIn(user: UserProfile): Promise<UserProfile> {
 }
 
 export async function getWeekCheckIns(userId: string): Promise<boolean[]> {
-  if (!isFirebaseConfigured) return [false, false, false, false, false, false, false]
   const start = startOfWeek()
   const dates = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(start)
     d.setDate(start.getDate() + i)
     return todayKey(d)
   })
+
+  if (useLocal(userId) || !isFirebaseConfigured) {
+    const set = new Set(localStore.listCheckInDates(userId))
+    return dates.map((date) => set.has(date))
+  }
 
   const snap = await getDocs(
     query(collection(requireDb(), 'checkIns'), where('userId', '==', userId)),
