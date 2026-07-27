@@ -47,53 +47,56 @@ export function MealPhotoSheet({
   }
 
   return (
-    <>
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-opacity duration-300 ${
+        open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+      }`}
+      aria-hidden={!open}
+    >
       <div
-        className={`fixed inset-0 z-40 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
         onClick={onClose}
-        aria-hidden={!open}
       />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Análise da refeição"
-        className={`fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] transition-transform duration-300 ease-out ${
-          open ? 'translate-y-0' : 'translate-y-full'
+        className={`relative z-10 mx-auto flex w-full max-w-[380px] max-h-[min(88vh,720px)] flex-col overflow-hidden rounded-3xl bg-surface-2 shadow-2xl transition-all duration-300 ease-out ${
+          open ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'
         }`}
       >
-        <div className="rounded-t-3xl bg-surface-2 pb-[env(safe-area-inset-bottom)] shadow-2xl">
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="h-1 w-10 rounded-full bg-neutral-600" />
+        <div className="flex shrink-0 items-start justify-between gap-3 px-4 pt-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
+              Scan calórico
+            </p>
+            <h2 className="font-display mt-1 text-xl font-bold">Foto da refeição</h2>
           </div>
+          <button
+            onClick={onClose}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-3 text-neutral-400"
+            aria-label="Fechar"
+          >
+            <CloseIcon className="h-5 w-5" />
+          </button>
+        </div>
 
-          <div className="flex items-start justify-between gap-3 px-4 pt-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-brand">
-                Scan calórico
-              </p>
-              <h2 className="font-display mt-1 text-xl font-bold">Foto da refeição</h2>
-            </div>
-            <button
-              onClick={onClose}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-surface-3 text-neutral-400"
-              aria-label="Fechar"
-            >
-              <CloseIcon className="h-5 w-5" />
-            </button>
-          </div>
-
-          {previewUrl && (
-            <div className="mx-4 mt-4 overflow-hidden rounded-2xl bg-black aspect-[4/3]">
+        <div className="scroll-area flex-1 overflow-y-auto px-4 pb-4 pt-3">
+          {previewUrl ? (
+            <div className="overflow-hidden rounded-2xl bg-black aspect-[4/3]">
               <img src={previewUrl} alt="Refeição" className="h-full w-full object-cover" />
+            </div>
+          ) : (
+            <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-surface-3">
+              <p className="text-sm text-neutral-500">Carregando foto…</p>
             </div>
           )}
 
-          <div className="px-4 py-4">
+          <div className="mt-4">
             {analyzing && (
               <div className="rounded-2xl border border-brand/20 bg-brand/10 px-4 py-5 text-center">
+                <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-brand/30 border-t-brand" />
                 <p className="font-display text-lg font-bold text-brand">Contando calorias…</p>
                 <p className="mt-1 text-sm text-neutral-400">
                   A IA está identificando os alimentos do prato
@@ -192,6 +195,6 @@ export function MealPhotoSheet({
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
