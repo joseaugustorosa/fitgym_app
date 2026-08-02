@@ -35,7 +35,7 @@ export function ExercisePreviewSheet({ exercise, onClose }: ExercisePreviewSheet
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[210] bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-[210] sheet-overlay backdrop-blur-sm"
         onClick={onClose}
         aria-hidden={!open}
       />

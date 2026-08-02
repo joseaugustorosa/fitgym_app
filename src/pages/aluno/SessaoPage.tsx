@@ -7,7 +7,6 @@ import {
   SaladIcon,
 } from '../../components/icons'
 import { useAuth } from '../../contexts/AuthContext'
-import { ColorModeToggle } from '../../components/ColorModeToggle'
 import { isGymStaff } from '../../lib/roles'
 import {
   doCheckIn,
@@ -209,7 +208,6 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <ColorModeToggle compact />
           {isGymStaff(profile.role) && (
             <Link
               to="/admin"
@@ -461,7 +459,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
       <button
         type="button"
         onClick={() => setTipIndex((i) => (i + 1) % tips.length)}
-        className="pressable anim-rise rounded-2xl border border-white/8 bg-gradient-to-br from-white/[0.06] to-transparent p-4 text-left"
+        className="pressable anim-rise surface-card rounded-2xl p-4 text-left"
       >
         <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-brand">
           Dica rápida · toque para outra

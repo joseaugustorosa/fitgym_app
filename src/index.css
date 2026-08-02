@@ -45,6 +45,9 @@
   --color-hover-subtle: rgba(255, 255, 255, 0.05);
   --color-field-bg: rgba(255, 255, 255, 0.03);
   --color-field-border: rgba(255, 255, 255, 0.08);
+  --color-subtle-fill: rgba(0, 0, 0, 0.22);
+  --color-chart-track: #262626;
+  --color-overlay: rgba(0, 0, 0, 0.65);
 }
 
 [data-color-mode="light"] {
@@ -57,7 +60,7 @@
   --color-border: #d4d4d8;
   --color-panel-border: rgba(0, 0, 0, 0.08);
   --color-shell-border: rgba(0, 0, 0, 0.06);
-  --color-nav-bg: rgba(255, 255, 255, 0.92);
+  --color-nav-bg: rgba(255, 255, 255, 0.94);
   --color-player-bg: #fafafa;
   --color-player-footer: #f4f4f5;
   --color-noise-opacity: 0.02;
@@ -71,6 +74,9 @@
   --color-hover-subtle: rgba(0, 0, 0, 0.04);
   --color-field-bg: rgba(0, 0, 0, 0.02);
   --color-field-border: rgba(0, 0, 0, 0.1);
+  --color-subtle-fill: rgba(0, 0, 0, 0.04);
+  --color-chart-track: #d4d4d8;
+  --color-overlay: rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -134,10 +140,31 @@ body::before {
   color: #737373;
 }
 
+[data-color-mode="light"] .text-amber-300 {
+  color: #d97706;
+}
+
+[data-color-mode="light"] .text-emerald-300 {
+  color: #059669;
+}
+
+[data-color-mode="light"] .border-neutral-600 {
+  border-color: #a3a3a3;
+}
+
+[data-color-mode="light"] .bg-black\/20,
+[data-color-mode="light"] .bg-black\/30 {
+  background-color: var(--color-subtle-fill);
+}
+
 [data-color-mode="light"] .border-white\/6,
 [data-color-mode="light"] .border-white\/8,
 [data-color-mode="light"] .border-white\/10 {
   border-color: var(--color-panel-border);
+}
+
+[data-color-mode="light"] .border-dashed.border-white\/10 {
+  border-color: var(--color-border);
 }
 
 [data-color-mode="light"] .bg-black\/55,
@@ -147,6 +174,33 @@ body::before {
 
 [data-color-mode="light"] .hover\:bg-white\/5:hover {
   background-color: var(--color-hover-subtle);
+}
+
+.surface-card {
+  border: 1px solid var(--color-panel-border);
+  background: linear-gradient(160deg, var(--color-glass-from), transparent);
+}
+
+.subtle-fill {
+  background: var(--color-subtle-fill);
+}
+
+.sheet-overlay {
+  background: var(--color-overlay);
+}
+
+.chart-track {
+  stroke: var(--color-chart-track);
+}
+
+.progress-track {
+  background: var(--color-subtle-fill);
+}
+
+.input-surface {
+  border: 1px solid var(--color-field-border);
+  background: var(--color-field-bg);
+  color: var(--color-app-text);
 }
 
 .font-display {

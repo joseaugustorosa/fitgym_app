@@ -254,7 +254,7 @@ export function WorkoutPlayer({
             </p>
             <div className="relative mt-6 flex h-44 w-44 items-center justify-center">
               <svg className="absolute inset-0 -rotate-90" viewBox="0 0 176 176">
-                <circle cx="88" cy="88" r="76" fill="none" stroke="#262626" strokeWidth="10" />
+                <circle cx="88" cy="88" r="76" fill="none" className="chart-track" strokeWidth="10" />
                 <circle
                   cx="88"
                   cy="88"
@@ -290,7 +290,7 @@ export function WorkoutPlayer({
             <button
               type="button"
               onClick={skipRest}
-              className="pressable mt-8 rounded-2xl border border-white/10 bg-surface-3 px-8 py-3 text-sm font-bold text-neutral-300"
+              className="pressable mt-8 rounded-2xl border border-[var(--color-panel-border)] bg-surface-3 px-8 py-3 text-sm font-bold text-neutral-300"
             >
               Pular descanso →
             </button>
@@ -299,14 +299,14 @@ export function WorkoutPlayer({
                 type="button"
                 onClick={skipExercise}
                 disabled={saving}
-                className="pressable flex-1 rounded-xl border border-white/10 py-2.5 text-xs font-semibold text-neutral-400 disabled:opacity-50"
+                className="pressable flex-1 rounded-xl border border-[var(--color-panel-border)] py-2.5 text-xs font-semibold text-neutral-400 disabled:opacity-50"
               >
                 Pular exercício
               </button>
               <button
                 type="button"
                 onClick={finishWorkout}
-                className="pressable flex-1 rounded-xl border border-white/10 py-2.5 text-xs font-semibold text-neutral-400"
+                className="pressable flex-1 rounded-xl border border-[var(--color-panel-border)] py-2.5 text-xs font-semibold text-neutral-400"
               >
                 Finalizar treino
               </button>
@@ -402,7 +402,7 @@ export function WorkoutPlayer({
               type="button"
               disabled={saving}
               onClick={skipExercise}
-              className="pressable rounded-xl border border-white/10 bg-surface-3 py-3 text-sm font-semibold text-neutral-300 disabled:opacity-50"
+              className="pressable rounded-xl border border-[var(--color-panel-border)] bg-surface-3 py-3 text-sm font-semibold text-neutral-300 disabled:opacity-50"
             >
               Pular exercício
             </button>

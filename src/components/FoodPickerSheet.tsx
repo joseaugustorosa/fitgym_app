@@ -100,7 +100,7 @@ export function FoodPickerSheet({
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/65 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`fixed inset-0 z-40 sheet-overlay backdrop-blur-sm transition-opacity duration-300 ${
           open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -237,7 +237,7 @@ export function FoodPickerSheet({
                     type="button"
                     onClick={() => void useAiEstimate()}
                     disabled={estimating}
-                    className="mt-3 w-full rounded-xl border border-white/10 py-3 text-sm font-semibold text-neutral-300 disabled:opacity-60"
+                    className="mt-3 w-full rounded-xl border border-[var(--color-panel-border)] py-3 text-sm font-semibold text-neutral-300 disabled:opacity-60"
                   >
                     {estimating ? 'Consultando IA…' : 'Não achei na lista — usar IA'}
                   </button>

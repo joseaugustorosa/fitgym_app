@@ -323,7 +323,7 @@ export function DietaPage() {
           <div className="flex items-center gap-4">
             <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
               <svg className="absolute inset-0 -rotate-90" viewBox="0 0 112 112">
-                <circle cx="56" cy="56" r="46" fill="none" stroke="#262626" strokeWidth="9" />
+                <circle cx="56" cy="56" r="46" fill="none" className="chart-track" strokeWidth="9" />
                 <circle
                   cx="56"
                   cy="56"
@@ -386,7 +386,7 @@ export function DietaPage() {
                     {macro.current}
                     <span className="font-normal text-neutral-500">/{macro.goal}g</span>
                   </p>
-                  <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/30">
+                  <div className="mt-2 h-1 overflow-hidden rounded-full progress-track">
                     <div className={`h-full rounded-full ${macro.color}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
@@ -520,7 +520,7 @@ export function DietaPage() {
             <button
               type="button"
               onClick={() => setManualOpen(true)}
-              className="pressable glass-panel rounded-2xl border border-white/10 p-3 text-left"
+              className="pressable glass-panel rounded-2xl border border-[var(--color-panel-border)] p-3 text-left"
             >
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand">Manual</p>
               <p className="mt-1 text-sm font-bold leading-tight">Digitar kcal</p>
@@ -528,7 +528,7 @@ export function DietaPage() {
             <button
               type="button"
               onClick={openCamera}
-              className="pressable glass-panel rounded-2xl border border-white/10 p-3 text-left"
+              className="pressable glass-panel rounded-2xl border border-[var(--color-panel-border)] p-3 text-left"
             >
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand">Foto</p>
               <p className="mt-1 text-sm font-bold leading-tight">IA estima</p>
@@ -559,7 +559,7 @@ export function DietaPage() {
             )}
           </div>
           {scans.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center">
+            <div className="rounded-2xl border border-dashed border-[var(--color-border)] px-4 py-6 text-center">
               <p className="text-sm text-neutral-400">Nada registrado ainda</p>
               <p className="mt-1 text-xs text-neutral-500">
                 Busque um alimento, digite as calorias ou use uma foto
@@ -603,7 +603,7 @@ export function DietaPage() {
         </section>
 
         {plan && (
-          <section className="rounded-2xl border border-white/6 bg-surface-2/50 p-4">
+          <section className="rounded-2xl border border-[var(--color-panel-border)] bg-surface-2/50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
               Sugestão da academia
             </p>

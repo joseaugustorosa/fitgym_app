@@ -66,7 +66,7 @@ export function ManualFoodSheet({
       }`}
       aria-hidden={!open}
     >
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 sheet-overlay backdrop-blur-sm" onClick={onClose} />
 
       <form
         onSubmit={onSubmit}
@@ -102,7 +102,7 @@ export function ManualFoodSheet({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ex: Marmita com frango e arroz"
-              className="mt-1 w-full rounded-xl border border-white/8 bg-surface-3 px-3 py-2.5 text-sm text-white outline-none focus:border-brand/40"
+              className="input-surface mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-brand/40"
             />
           </label>
           <label className="text-xs font-semibold text-neutral-400">
@@ -114,7 +114,7 @@ export function ManualFoodSheet({
               value={calories}
               onChange={(e) => setCalories(e.target.value)}
               placeholder="450"
-              className="mt-1 w-full rounded-xl border border-white/8 bg-surface-3 px-3 py-2.5 text-sm text-white outline-none focus:border-brand/40"
+              className="input-surface mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-brand/40"
             />
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -125,7 +125,7 @@ export function ManualFoodSheet({
                 min={0}
                 value={protein}
                 onChange={(e) => setProtein(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-white/8 bg-surface-3 px-3 py-2.5 text-sm text-white outline-none focus:border-brand/40"
+                className="input-surface mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-brand/40"
               />
             </label>
             <label className="text-xs font-semibold text-neutral-400">
@@ -135,7 +135,7 @@ export function ManualFoodSheet({
                 min={0}
                 value={carbs}
                 onChange={(e) => setCarbs(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-white/8 bg-surface-3 px-3 py-2.5 text-sm text-white outline-none focus:border-brand/40"
+                className="input-surface mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-brand/40"
               />
             </label>
             <label className="text-xs font-semibold text-neutral-400">
@@ -145,7 +145,7 @@ export function ManualFoodSheet({
                 min={0}
                 value={fat}
                 onChange={(e) => setFat(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-white/8 bg-surface-3 px-3 py-2.5 text-sm text-white outline-none focus:border-brand/40"
+                className="input-surface mt-1 w-full rounded-xl px-3 py-2.5 text-sm outline-none focus:border-brand/40"
               />
             </label>
           </div>

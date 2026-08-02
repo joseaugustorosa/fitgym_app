@@ -54,7 +54,7 @@ export function MealPhotoSheet({
       aria-hidden={!open}
     >
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 sheet-overlay backdrop-blur-sm"
         onClick={onClose}
       />
 

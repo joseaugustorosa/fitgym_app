@@ -294,7 +294,7 @@ export function ComunidadePage() {
                   </div>
 
                   {openComments === post.id && (
-                    <div className="border-t border-border bg-black/20 px-4 py-3">
+                    <div className="subtle-fill border-t border-border px-4 py-3">
                       <div className="mb-3 flex max-h-40 flex-col gap-2 overflow-y-auto">
                         {comments.length === 0 && (
                           <p className="text-xs text-neutral-500">Nenhum comentário ainda</p>

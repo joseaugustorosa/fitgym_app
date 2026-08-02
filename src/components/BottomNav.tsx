@@ -1,5 +1,7 @@
 import type { TabId } from '../types/index'
 import { HomeIcon, DumbbellIcon, SaladIcon, UsersIcon } from './icons'
+import { ColorModeToggle } from './ColorModeToggle'
+import { useColorMode } from '../contexts/ColorModeContext'
 
 const tabs: { id: TabId; label: string; Icon: typeof HomeIcon }[] = [
   { id: 'sessao', label: 'Sessão', Icon: HomeIcon },
@@ -15,9 +17,16 @@ interface BottomNavProps {
 
 export function BottomNav({ active, onChange }: BottomNavProps) {
   const activeIndex = Math.max(0, tabs.findIndex((t) => t.id === active))
+  const { mode } = useColorMode()
 
   return (
     <nav className="bottom-nav shrink-0 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl">
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--color-panel-border)] px-3 py-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-neutral-500">
+          Tema · {mode === 'dark' ? 'Escuro' : 'Claro'}
+        </p>
+        <ColorModeToggle compact />
+      </div>
       <div className="relative flex items-stretch justify-around px-2 pt-2">
         <div
           className="nav-indicator pointer-events-none absolute top-1.5 h-1 w-10 rounded-full bg-brand"
