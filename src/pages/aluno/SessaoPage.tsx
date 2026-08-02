@@ -7,29 +7,24 @@ import {
   SaladIcon,
 } from '../../components/icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { isGymStaff } from '../../lib/roles'
 import {
   doCheckIn,
-  getEatenMeals,
-  getMealPlanForUser,
   getWaterLog,
   getWeekCheckIns,
   getWorkoutProgress,
   listChallenges,
+  listGymTips,
+  listMealScans,
   listWorkoutPlans,
   setWaterLiters,
 } from '../../services/api'
 import { formatCheckInLabel, greetingForNow, todayKey } from '../../lib/dates'
+import { resolveNutritionGoals } from '../../lib/nutrition'
+import { normalizeWorkoutPlan, planDisplayName, planSessionsLine } from '../../lib/workoutPlan'
 import type { TabId } from '../../types'
 
 const weekDays = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
-
-const tips = [
-  'Hidrate-se antes do treino — 300ml já ajuda.',
-  'Priorize a proteína na primeira refeição pós-treino.',
-  'Sequência bate intensidade: apareça hoje.',
-  'Descanso também é treino. Durma bem.',
-  'Ajuste a carga: últimas 2 reps devem doer, não quebrar.',
-]
 
 interface SessaoPageProps {
   onNavigate: (tab: TabId) => void
@@ -72,9 +67,11 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
   const [savingWater, setSavingWater] = useState(false)
   const [workoutPct, setWorkoutPct] = useState(0)
   const [workoutLabel, setWorkoutLabel] = useState('Treino de hoje')
-  const [mealsDone, setMealsDone] = useState(0)
-  const [mealsTotal, setMealsTotal] = useState(0)
-  const [tipIndex, setTipIndex] = useState(() => new Date().getDate() % tips.length)
+  const [workoutSubtitle, setWorkoutSubtitle] = useState('')
+  const [caloriesToday, setCaloriesToday] = useState(0)
+  const [calorieGoal, setCalorieGoal] = useState(2000)
+  const [tips, setTips] = useState<string[]>([])
+  const [tipIndex, setTipIndex] = useState(0)
   const [pulseDay, setPulseDay] = useState<number | null>(null)
 
   useEffect(() => {
@@ -82,37 +79,55 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
     let cancelled = false
 
     async function load() {
-      const [week, water, plans, mealPlan, eaten] = await Promise.all([
+      if (!profile!.gymId) return
+      const [week, water, plans, scans, gymTips] = await Promise.all([
         getWeekCheckIns(profile!.uid),
-        getWaterLog(profile!.uid),
-        listWorkoutPlans(),
-        getMealPlanForUser(profile!),
-        getEatenMeals(profile!.uid),
+        getWaterLog(profile!),
+        listWorkoutPlans(profile!.gymId),
+        listMealScans(profile!.uid),
+        listGymTips(profile!.gymId),
       ])
       if (cancelled) return
 
       setWeekProgress(week)
       setWater(water.liters)
       setWaterGoal(water.goalLiters)
-      setMealsTotal(mealPlan.meals.length)
-      setMealsDone(eaten.length)
+      const goals = resolveNutritionGoals(profile!)
+      setCalorieGoal(goals.calorieGoal)
+      setCaloriesToday(scans.reduce((sum, s) => sum + s.calories, 0))
+      setTips(gymTips.map((t) => t.text))
 
-      const plan =
-        plans.find((p) => p.id === profile!.assignedWorkoutPlanId) ??
-        plans.find((p) => p.active) ??
-        plans[0] ??
-        null
+      const plan = profile!.assignedWorkoutPlanId
+        ? plans.find((p) => p.id === profile!.assignedWorkoutPlanId) ?? null
+        : null
       if (plan) {
-        setWorkoutLabel(plan.title)
-        const progress = await getWorkoutProgress(profile!.uid)
+        const normalized = normalizeWorkoutPlan(plan)
+        setWorkoutLabel(planDisplayName(normalized))
+        const dayCount = normalized.sessions.length
+        const dayNames = planSessionsLine(normalized)
+        const totalExercises = normalized.sessions.reduce((n, s) => n + s.exerciseIds.length, 0)
+        setWorkoutSubtitle(
+          dayCount > 0
+            ? `${dayCount} dia${dayCount !== 1 ? 's' : ''}: ${dayNames} · ${totalExercises} exercícios`
+            : 'Sem dias configurados',
+        )
+        let done = 0
+        let total = 0
+        for (const session of normalized.sessions) {
+          const progress = await getWorkoutProgress(profile!.uid, session.id)
+          done += progress?.completedExerciseIds.length ?? 0
+          total += session.exerciseIds.length
+        }
         if (cancelled) return
-        const total = plan.exerciseIds.length || 1
-        const done = progress?.completedExerciseIds.length ?? 0
-        setWorkoutPct(Math.min(100, Math.round((done / total) * 100)))
+        setWorkoutPct(total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0)
+      } else {
+        setWorkoutLabel('Treino')
+        setWorkoutSubtitle('')
+        setWorkoutPct(0)
       }
 
       try {
-        const list = await listChallenges()
+        const list = await listChallenges(profile!.gymId)
         if (list[0] && !cancelled) {
           setChallengeTitle(list[0].title)
           setChallengeSubtitle(`${list[0].participants} pessoas · toque para entrar`)
@@ -166,7 +181,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
     const next = Math.max(0, Math.round((waterLiters + delta) * 100) / 100)
     setSavingWater(true)
     try {
-      const log = await setWaterLiters(profile.uid, next)
+      const log = await setWaterLiters(profile, next, todayKey(), waterGoal)
       setWater(log.liters)
       setWaterGoal(log.goalLiters)
     } finally {
@@ -176,7 +191,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
 
   const waterPct = Math.min(100, Math.round((waterLiters / Math.max(waterGoal, 0.1)) * 100))
   const mealsPct =
-    mealsTotal === 0 ? 0 : Math.min(100, Math.round((mealsDone / mealsTotal) * 100))
+    calorieGoal === 0 ? 0 : Math.min(100, Math.round((caloriesToday / calorieGoal) * 100))
 
   return (
     <div className="flex flex-col gap-5 px-4 pb-6">
@@ -188,9 +203,12 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
           <h1 className="font-display mt-1 text-3xl font-extrabold tracking-tight">
             {profile.name.split(' ')[0]}
           </h1>
+          {profile.unit?.trim() && (
+            <p className="mt-0.5 text-sm text-neutral-400">{profile.unit.trim()}</p>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {profile.role === 'admin' && (
+          {isGymStaff(profile.role) && (
             <Link
               to="/admin"
               className="rounded-xl border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand"
@@ -234,7 +252,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
-              {profile.unit}
+              Check-in da semana
             </p>
             <h2 className="font-display mt-1 text-xl font-extrabold leading-tight text-white">
               {checkedInToday ? 'Você já chegou!' : 'Pronto para treinar?'}
@@ -374,12 +392,15 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate font-semibold">{workoutLabel}</p>
+                {workoutSubtitle ? (
+                  <p className="truncate text-xs text-neutral-500">{workoutSubtitle}</p>
+                ) : null}
                 <p className="text-sm text-neutral-400">
                   {workoutPct === 0
                     ? 'Ainda não começou — toque para treinar'
                     : workoutPct >= 100
-                      ? 'Treino concluído hoje'
-                      : `${workoutPct}% concluído — continuar`}
+                      ? 'Programa concluído hoje'
+                      : `${workoutPct}% do programa · continuar`}
                 </p>
               </div>
               <ChevronRightIcon className="h-5 w-5 shrink-0 text-neutral-500" />
@@ -403,9 +424,9 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
             <div className="min-w-0 flex-1">
               <p className="font-semibold">Alimentação</p>
               <p className="text-sm text-neutral-400">
-                {mealsTotal === 0
+                {caloriesToday === 0
                   ? 'Registrar o que você comeu'
-                  : `${mealsDone}/${mealsTotal} refeições · ${mealsPct}%`}
+                  : `${caloriesToday}/${calorieGoal} kcal · ${mealsPct}% da meta`}
               </p>
             </div>
             <div className="relative h-10 w-10 shrink-0">
@@ -434,6 +455,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
         </div>
       </section>
 
+      {tips.length > 0 && (
       <button
         type="button"
         onClick={() => setTipIndex((i) => (i + 1) % tips.length)}
@@ -444,6 +466,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
         </p>
         <p className="mt-2 text-sm leading-relaxed text-neutral-200">{tips[tipIndex]}</p>
       </button>
+      )}
 
       <section>
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">

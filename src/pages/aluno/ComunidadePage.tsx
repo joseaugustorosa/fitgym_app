@@ -16,28 +16,6 @@ import {
 import { daysLeft, formatRelativeTime } from '../../lib/dates'
 import type { Challenge, Post, PostComment } from '../../types'
 
-function GymAdPost() {
-  return (
-    <article className="overflow-hidden rounded-xl border border-brand/20 bg-surface-2">
-      <div className="flex items-center justify-between border-b border-brand/10 bg-brand/5 px-4 py-2.5">
-        <span className="rounded-lg bg-brand/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">
-          FitGym
-        </span>
-        <span className="text-[10px] text-neutral-500">Anúncio</span>
-      </div>
-      <p className="px-4 py-3 text-sm leading-relaxed">
-        <span className="font-semibold text-brand">Plano Anual com 40% OFF</span> — treine
-        ilimitado com avaliação física inclusa.
-      </p>
-      <div className="px-4 pb-4">
-        <button className="pressable w-full rounded-xl bg-brand py-3 text-sm font-bold text-white">
-          Quero aproveitar
-        </button>
-      </div>
-    </article>
-  )
-}
-
 export function ComunidadePage() {
   const { profile } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
@@ -53,12 +31,11 @@ export function ComunidadePage() {
   const [commenting, setCommenting] = useState(false)
 
   useEffect(() => {
-    listPosts().then(setPosts)
-    listChallenges().then(setChallenges)
-    if (profile) {
-      getLikedPostIds(profile.uid).then(setLikedPosts)
-      getJoinedChallengeIds(profile.uid).then(setJoined)
-    }
+    if (!profile?.gymId) return
+    listPosts(profile.gymId).then(setPosts)
+    listChallenges(profile.gymId).then(setChallenges)
+    getLikedPostIds(profile.uid).then(setLikedPosts)
+    getJoinedChallengeIds(profile.uid).then(setJoined)
   }, [profile])
 
   const members = useMemo(() => {
@@ -271,7 +248,7 @@ export function ComunidadePage() {
               Ainda não há posts. Seja o primeiro a publicar!
             </p>
           )}
-          {posts.map((post, index) => {
+          {posts.map((post) => {
             const liked = likedPosts.has(post.id)
             const isMine = profile?.uid === post.authorId
             return (
@@ -347,8 +324,6 @@ export function ComunidadePage() {
                     </div>
                   )}
                 </article>
-
-                {index === 0 && <GymAdPost />}
               </div>
             )
           })}

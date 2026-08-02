@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   deleteChallenge,
   deletePost,
@@ -7,10 +8,10 @@ import {
   saveChallenge,
 } from '../../services/api'
 import { daysLeft, formatRelativeTime } from '../../lib/dates'
+import { FormField, adminField } from '../../components/FormField'
 import type { Challenge, Post } from '../../types'
 
-const field =
-  'w-full rounded-xl border border-border bg-surface-3 px-3 py-2 outline-none focus:border-brand'
+const field = adminField
 
 const templates = [
   { title: '30 dias de treino', emoji: '🔥', days: 30, participants: 0 },
@@ -27,6 +28,8 @@ function slugify(value: string) {
 }
 
 export function AdminComunidadePage() {
+  const { profile } = useAuth()
+  const gymId = profile?.gymId ?? ''
   const [posts, setPosts] = useState<Post[]>([])
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [form, setForm] = useState({
@@ -40,14 +43,15 @@ export function AdminComunidadePage() {
   const [busy, setBusy] = useState(false)
 
   async function reload() {
-    const [p, c] = await Promise.all([listPosts(50), listChallenges()])
+    if (!gymId) return
+    const [p, c] = await Promise.all([listPosts(gymId, 50), listChallenges(gymId)])
     setPosts(p)
     setChallenges(c)
   }
 
   useEffect(() => {
     reload().catch(() => undefined)
-  }, [])
+  }, [gymId])
 
   async function onSaveChallenge(e: FormEvent) {
     e.preventDefault()
@@ -56,6 +60,7 @@ export function AdminComunidadePage() {
       const id = form.id || slugify(form.title)
       await saveChallenge({
         id,
+        gymId,
         title: form.title,
         emoji: form.emoji,
         participants: form.participants,
@@ -89,35 +94,39 @@ export function AdminComunidadePage() {
             </button>
           ))}
         </div>
-        <form onSubmit={onSaveChallenge} className="mt-3 grid gap-2 rounded-2xl bg-surface-2 p-4">
-          <input
-            required
-            placeholder="Título"
-            value={form.title}
-            onChange={(e) => setForm({ ...form, title: e.target.value })}
-            className={field}
-          />
-          <div className="grid grid-cols-3 gap-2">
+        <form onSubmit={onSaveChallenge} className="mt-3 grid gap-3 rounded-2xl bg-surface-2 p-4">
+          <FormField label="Título do desafio" hint="Ex: 30 dias de treino">
             <input
-              placeholder="Emoji"
-              value={form.emoji}
-              onChange={(e) => setForm({ ...form, emoji: e.target.value })}
+              required
+              value={form.title}
+              onChange={(e) => setForm({ ...form, title: e.target.value })}
               className={field}
             />
-            <input
-              type="number"
-              placeholder="Participantes"
-              value={form.participants}
-              onChange={(e) => setForm({ ...form, participants: Number(e.target.value) || 0 })}
-              className={field}
-            />
-            <input
-              type="number"
-              placeholder="Dias"
-              value={form.days}
-              onChange={(e) => setForm({ ...form, days: Number(e.target.value) || 30 })}
-              className={field}
-            />
+          </FormField>
+          <div className="grid grid-cols-3 gap-3">
+            <FormField label="Emoji" hint="Ex: 🔥">
+              <input
+                value={form.emoji}
+                onChange={(e) => setForm({ ...form, emoji: e.target.value })}
+                className={field}
+              />
+            </FormField>
+            <FormField label="Participantes" hint="Contagem inicial (0 = novo)">
+              <input
+                type="number"
+                value={form.participants}
+                onChange={(e) => setForm({ ...form, participants: Number(e.target.value) || 0 })}
+                className={field}
+              />
+            </FormField>
+            <FormField label="Duração (dias)" hint="Ex: 7, 14, 30">
+              <input
+                type="number"
+                value={form.days}
+                onChange={(e) => setForm({ ...form, days: Number(e.target.value) || 30 })}
+                className={field}
+              />
+            </FormField>
           </div>
           <button
             type="submit"

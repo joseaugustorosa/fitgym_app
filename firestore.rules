@@ -6,65 +6,153 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function userDoc() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    function profilePath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
-    function isAdmin() {
-      return signedIn() && userDoc().role == 'admin';
+    function hasProfile() {
+      return signedIn() && exists(profilePath());
+    }
+
+    function profile() {
+      return get(profilePath()).data;
+    }
+
+    function role() {
+      let r = profile().role;
+      return r == 'admin' ? 'gym_admin' : r;
+    }
+
+    function userGymId() {
+      return profile().gymId;
+    }
+
+    function isSuperAdmin() {
+      return hasProfile() && role() == 'super_admin';
+    }
+
+    function isGymStaff() {
+      return hasProfile() && (role() == 'gym_admin' || role() == 'professor');
+    }
+
+    function isGymAdmin() {
+      return hasProfile() && role() == 'gym_admin';
     }
 
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function sameGym(gymId) {
+      return hasProfile() && userGymId() == gymId;
+    }
+
+    function canReadGymData(gymId) {
+      return isSuperAdmin() || sameGym(gymId);
+    }
+
+    function staffSameGym(gymId) {
+      return isGymStaff() && sameGym(gymId);
+    }
+
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow create: if isAdmin() || (isOwner(uid) && request.resource.data.role == 'aluno');
-      allow update: if isAdmin() || (isOwner(uid)
-        && request.resource.data.role == resource.data.role
-        && request.resource.data.email == resource.data.email);
-      allow delete: if isAdmin();
+      allow read: if isOwner(uid) || isSuperAdmin() || (isGymStaff() && resource.data.gymId == userGymId());
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        || (isGymStaff() && resource.data.gymId == userGymId() && resource.data.role == 'aluno')
+        || (isOwner(uid)
+          && request.resource.data.role == resource.data.role
+          && request.resource.data.email == resource.data.email
+          && request.resource.data.gymId == resource.data.gymId);
+      allow delete: if isSuperAdmin();
+    }
+
+    match /gyms/{gymId} {
+      allow read: if isSuperAdmin() || sameGym(gymId);
+      allow write: if isSuperAdmin();
+    }
+
+    match /gymBranches/{id} {
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create, update: if isGymAdmin() && sameGym(request.resource.data.gymId);
+      allow delete: if isGymAdmin() && sameGym(resource.data.gymId);
+    }
+
+    match /gymBilling/{id} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /invites/{token} {
+      allow read: if resource.data.status == 'pending'
+        || (isGymStaff() && resource.data.gymId == userGymId())
+        || isSuperAdmin();
+      allow write: if false;
     }
 
     match /checkIns/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isAdmin();
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || staffSameGym(resource.data.gymId)
+        || isSuperAdmin()
+      );
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.gymId == userGymId();
+      allow update, delete: if isGymAdmin() || isSuperAdmin();
     }
 
     match /exercises/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create, update: if isGymAdmin() && sameGym(request.resource.data.gymId);
+      allow delete: if isGymAdmin() && sameGym(resource.data.gymId);
     }
 
     match /workoutPlans/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create, update: if isGymAdmin() && sameGym(request.resource.data.gymId);
+      allow delete: if isGymAdmin() && sameGym(resource.data.gymId);
     }
 
     match /userWorkoutProgress/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || staffSameGym(resource.data.gymId)
+        || isSuperAdmin()
+      );
+      allow create, update: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.gymId == userGymId();
+      allow delete: if isGymAdmin() || isOwner(resource.data.userId) || isSuperAdmin();
     }
 
     match /mealPlans/{id} {
-      allow read: if signedIn();
-      allow write: if isAdmin();
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create, update: if isGymAdmin() && sameGym(request.resource.data.gymId);
+      allow delete: if isGymAdmin() && sameGym(resource.data.gymId);
     }
 
     match /waterLogs/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || staffSameGym(resource.data.gymId)
+        || isSuperAdmin()
+      );
       allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
+      allow delete: if isGymAdmin() || isSuperAdmin();
     }
 
     match /posts/{id} {
-      allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
-      allow update: if signedIn();
-      allow delete: if isAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create: if signedIn()
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.gymId == userGymId();
+      allow update: if (isGymAdmin() && sameGym(resource.data.gymId))
+        || (signedIn() && resource.data.authorId == request.auth.uid)
+        || (signedIn() && sameGym(resource.data.gymId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likesCount']))
+        || (signedIn() && sameGym(resource.data.gymId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['commentsCount']));
+      allow delete: if isGymAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
     }
 
     match /postLikes/{id} {
@@ -74,35 +162,55 @@ service cloud.firestore {
     }
 
     match /challenges/{id} {
-      allow read: if signedIn();
-      allow create, delete: if isAdmin();
-      allow update: if signedIn();
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create: if isGymAdmin() && sameGym(request.resource.data.gymId);
+      allow delete: if isGymAdmin() && sameGym(resource.data.gymId);
+      allow update: if (isGymAdmin() && sameGym(resource.data.gymId))
+        || (signedIn() && sameGym(resource.data.gymId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
+          && request.resource.data.participants == resource.data.participants + 1);
     }
 
     match /mealScans/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || staffSameGym(resource.data.gymId)
+        || isSuperAdmin()
+      );
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.gymId == userGymId();
       allow update, delete: if signedIn() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+        resource.data.userId == request.auth.uid || isGymAdmin() || isSuperAdmin()
       );
     }
 
     match /mealCompletions/{id} {
-      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if signedIn() && (
+        resource.data.userId == request.auth.uid
+        || staffSameGym(resource.data.gymId)
+        || isSuperAdmin()
+      );
       allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isAdmin();
+      allow delete: if isGymAdmin() || isSuperAdmin();
     }
 
     match /postComments/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
-      allow delete: if isAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
+      allow delete: if isGymAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
     }
 
     match /challengeJoins/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
       allow delete: if signedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    match /gymTips/{id} {
+      allow read: if signedIn() && canReadGymData(resource.data.gymId);
+      allow create, update: if isGymAdmin() && sameGym(request.resource.data.gymId);
+      allow delete: if isGymAdmin() && sameGym(resource.data.gymId);
     }
   }
 }

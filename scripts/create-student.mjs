@@ -17,7 +17,7 @@ if (!existsSync(keyPath)) {
   process.exit(1)
 }
 
-const [name, email, password, unit = 'Unidade Centro'] = process.argv.slice(2)
+const [name, email, password, unit = ''] = process.argv.slice(2)
 if (!name || !email || !password) {
   console.error('Uso: node scripts/create-student.mjs "Nome" email@x.com senha [unidade]')
   process.exit(1)

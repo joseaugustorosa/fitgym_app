@@ -1,10 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useAuth } from '../../contexts/AuthContext'
 import { listMealPlans, saveMealPlan } from '../../services/api'
 import { defaultMealPlan } from '../../data/defaults'
+import { FormField, adminField } from '../../components/FormField'
 import type { MealItem, MealPlan } from '../../types'
 
-const field =
-  'w-full rounded-xl border border-border bg-surface-3 px-3 py-2 outline-none focus:border-brand'
+const field = adminField
 
 const emptyMeal = (): MealItem => ({
   time: '12:00',
@@ -15,9 +16,12 @@ const emptyMeal = (): MealItem => ({
 })
 
 export function AdminDietaPage() {
+  const { profile } = useAuth()
+  const gymId = profile?.gymId ?? ''
   const [plans, setPlans] = useState<MealPlan[]>([])
   const [form, setForm] = useState<MealPlan>({
     id: 'default-meal-plan',
+    gymId,
     userId: null,
     isDefault: true,
     ...defaultMealPlan,
@@ -26,15 +30,17 @@ export function AdminDietaPage() {
   const [busy, setBusy] = useState(false)
 
   async function reload() {
-    const list = await listMealPlans()
+    if (!gymId) return
+    const list = await listMealPlans(gymId)
     setPlans(list)
     const def = list.find((p) => p.isDefault) ?? list[0]
     if (def) setForm(def)
   }
 
   useEffect(() => {
+    if (gymId) setForm((f) => ({ ...f, gymId }))
     reload().catch(() => undefined)
-  }, [])
+  }, [gymId])
 
   async function onSave(e: FormEvent) {
     e.preventDefault()
@@ -42,6 +48,7 @@ export function AdminDietaPage() {
     try {
       const cleaned: MealPlan = {
         ...form,
+        gymId,
         meals: form.meals.map((m) => ({
           ...m,
           items: m.items.map((i) => i.trim()).filter(Boolean),
@@ -70,6 +77,7 @@ export function AdminDietaPage() {
           onClick={() =>
             setForm({
               id: 'default-meal-plan',
+              gymId,
               userId: null,
               isDefault: true,
               ...defaultMealPlan,
@@ -85,22 +93,24 @@ export function AdminDietaPage() {
       )}
 
       <form onSubmit={onSave} className="flex flex-col gap-3 rounded-2xl bg-surface-2 p-4">
-        <input
-          required
-          placeholder="Nome do plano"
-          value={form.name}
-          onChange={(e) => setForm({ ...form, name: e.target.value })}
-          className={field}
-        />
-        <input
-          type="number"
-          required
-          placeholder="Meta de kcal"
-          value={form.caloriesGoal}
-          onChange={(e) => setForm({ ...form, caloriesGoal: Number(e.target.value) || 0 })}
-          className={field}
-        />
-        <label className="flex items-center gap-2 text-sm">
+        <FormField label="Nome do plano" hint="Ex: Plano emagrecimento, Plano hipertrofia">
+          <input
+            required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            className={field}
+          />
+        </FormField>
+        <FormField label="Meta calórica diária (kcal)">
+          <input
+            type="number"
+            required
+            value={form.caloriesGoal}
+            onChange={(e) => setForm({ ...form, caloriesGoal: Number(e.target.value) || 0 })}
+            className={field}
+          />
+        </FormField>
+        <label className="flex items-center gap-2 text-sm text-neutral-300">
           <input
             type="checkbox"
             checked={form.isDefault}
@@ -109,40 +119,44 @@ export function AdminDietaPage() {
           Usar como template padrão para novos alunos
         </label>
 
-        <p className="text-sm font-semibold text-neutral-400">Macros</p>
+        <p className="text-sm font-semibold text-neutral-400">Macros (proteína, carbs, gordura)</p>
         {form.macros.map((macro, idx) => (
           <div key={macro.label} className="grid grid-cols-3 gap-2">
-            <input
-              value={macro.label}
-              onChange={(e) => {
-                const macros = [...form.macros]
-                macros[idx] = { ...macro, label: e.target.value }
-                setForm({ ...form, macros })
-              }}
-              className={field}
-            />
-            <input
-              type="number"
-              value={macro.current}
-              onChange={(e) => {
-                const macros = [...form.macros]
-                macros[idx] = { ...macro, current: Number(e.target.value) || 0 }
-                setForm({ ...form, macros })
-              }}
-              className={field}
-              placeholder="Atual"
-            />
-            <input
-              type="number"
-              value={macro.goal}
-              onChange={(e) => {
-                const macros = [...form.macros]
-                macros[idx] = { ...macro, goal: Number(e.target.value) || 0 }
-                setForm({ ...form, macros })
-              }}
-              className={field}
-              placeholder="Meta"
-            />
+            <FormField label="Nome">
+              <input
+                value={macro.label}
+                onChange={(e) => {
+                  const macros = [...form.macros]
+                  macros[idx] = { ...macro, label: e.target.value }
+                  setForm({ ...form, macros })
+                }}
+                className={field}
+              />
+            </FormField>
+            <FormField label="Atual (g)">
+              <input
+                type="number"
+                value={macro.current}
+                onChange={(e) => {
+                  const macros = [...form.macros]
+                  macros[idx] = { ...macro, current: Number(e.target.value) || 0 }
+                  setForm({ ...form, macros })
+                }}
+                className={field}
+              />
+            </FormField>
+            <FormField label="Meta (g)">
+              <input
+                type="number"
+                value={macro.goal}
+                onChange={(e) => {
+                  const macros = [...form.macros]
+                  macros[idx] = { ...macro, goal: Number(e.target.value) || 0 }
+                  setForm({ ...form, macros })
+                }}
+                className={field}
+              />
+            </FormField>
           </div>
         ))}
 
@@ -172,43 +186,48 @@ export function AdminDietaPage() {
               </button>
             </div>
             <div className="grid grid-cols-4 gap-2">
-              <input
-                value={meal.emoji}
-                onChange={(e) => updateMeal(idx, { emoji: e.target.value })}
-                className={field}
-                placeholder="Emoji"
-              />
-              <input
-                value={meal.time}
-                onChange={(e) => updateMeal(idx, { time: e.target.value })}
-                className={field}
-                placeholder="Horário"
-              />
-              <input
-                value={meal.name}
-                onChange={(e) => updateMeal(idx, { name: e.target.value })}
-                className={`col-span-2 ${field}`}
-                placeholder="Nome"
-                required
-              />
+              <FormField label="Emoji" hint="Ex: 🍳">
+                <input
+                  value={meal.emoji}
+                  onChange={(e) => updateMeal(idx, { emoji: e.target.value })}
+                  className={field}
+                />
+              </FormField>
+              <FormField label="Horário" hint="Ex: 08:00">
+                <input
+                  value={meal.time}
+                  onChange={(e) => updateMeal(idx, { time: e.target.value })}
+                  className={field}
+                />
+              </FormField>
+              <FormField label="Nome da refeição" className="col-span-2">
+                <input
+                  value={meal.name}
+                  onChange={(e) => updateMeal(idx, { name: e.target.value })}
+                  className={field}
+                  required
+                />
+              </FormField>
             </div>
-            <input
-              type="number"
-              value={meal.calories}
-              onChange={(e) => updateMeal(idx, { calories: Number(e.target.value) || 0 })}
-              className={`mt-2 ${field}`}
-              placeholder="kcal"
-            />
-            <input
-              value={meal.items.join(', ')}
-              onChange={(e) =>
-                updateMeal(idx, {
-                  items: e.target.value.split(',').map((x) => x.trim()),
-                })
-              }
-              className={`mt-2 ${field}`}
-              placeholder="Itens separados por vírgula"
-            />
+            <FormField label="Calorias (kcal)" className="mt-2">
+              <input
+                type="number"
+                value={meal.calories}
+                onChange={(e) => updateMeal(idx, { calories: Number(e.target.value) || 0 })}
+                className={field}
+              />
+            </FormField>
+            <FormField label="Itens" hint="Separe os alimentos com vírgula" className="mt-2">
+              <input
+                value={meal.items.join(', ')}
+                onChange={(e) =>
+                  updateMeal(idx, {
+                    items: e.target.value.split(',').map((x) => x.trim()),
+                  })
+                }
+                className={field}
+              />
+            </FormField>
           </div>
         ))}
 

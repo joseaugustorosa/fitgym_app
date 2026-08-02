@@ -72,6 +72,48 @@ body::before {
   box-shadow: 0 0 0 1px rgba(255, 90, 0, 0.04), 0 24px 80px rgba(0, 0, 0, 0.55);
 }
 
+.staff-shell {
+  background:
+    linear-gradient(180deg, rgba(14, 14, 14, 0.96) 0%, rgba(8, 8, 8, 0.99) 100%);
+}
+
+.staff-main-inner {
+  width: 100%;
+  padding: 1rem;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .staff-shell {
+    border: none;
+    box-shadow: none;
+  }
+
+  .staff-sidebar {
+    backdrop-filter: blur(12px);
+  }
+
+  .staff-main-inner {
+    max-width: 80rem;
+    margin-inline: auto;
+    padding: 2rem 2.5rem 2.5rem;
+  }
+
+  .staff-main {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  }
+
+  .staff-main::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .staff-main::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+}
+
 .glass-panel {
   background: linear-gradient(160deg, rgba(32, 32, 32, 0.9), rgba(18, 18, 18, 0.82));
   border: 1px solid rgba(255, 255, 255, 0.06);

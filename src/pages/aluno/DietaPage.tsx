@@ -1,29 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { MealPhotoSheet } from '../../components/MealPhotoSheet'
 import { FoodPickerSheet } from '../../components/FoodPickerSheet'
+import { ManualFoodSheet } from '../../components/ManualFoodSheet'
 import { compressImageFile } from '../../lib/image'
 import { todayKey } from '../../lib/dates'
+import { energyBalanceLabel, resolveNutritionGoals } from '../../lib/nutrition'
 import {
   analyzeMealPhotoRemote,
   deleteMealScan,
-  getEatenMeals,
   getMealPlanForUser,
   getWaterLog,
   listMealScans,
-  mockMealAnalysis,
   saveMealScan,
+  saveNutritionGoals,
   setWaterLiters,
-  toggleEatenMeal,
 } from '../../services/api'
 import { analyzeMealPhotoWithGeminiKey, hasGeminiBrowserKey } from '../../services/mealAi'
-import { isFirebaseConfigured } from '../../lib/firebase'
 import type { FoodPortion } from '../../services/foodApi'
-import type { MealAnalysisResult, MealPlan, MealScan, WaterLog } from '../../types'
+import type { MealAnalysisResult, MealPlan, MealScan, NutritionGoals, WaterLog } from '../../types'
 
 function scanSourceLabel(scan: MealScan) {
   const note = (scan.notes || '').toLowerCase()
   const items = scan.items.map((i) => i.toLowerCase())
+  if (note.includes('manual')) return 'Manual'
   if (note.includes('open food') || items.includes('openfoodfacts')) return 'Base de comidas'
   if (note.includes('catálogo') || items.includes('catalog')) return 'Catálogo'
   if (note.includes('ia') || items.includes('ai') || scan.confidence < 0.7) return 'Estimativa IA'
@@ -32,13 +32,17 @@ function scanSourceLabel(scan: MealScan) {
 }
 
 export function DietaPage() {
-  const { profile, isDemo } = useAuth()
+  const { profile, refreshProfile } = useAuth()
   const fileRef = useRef<HTMLInputElement>(null)
   const [plan, setPlan] = useState<MealPlan | null>(null)
+  const [goals, setGoals] = useState<NutritionGoals | null>(null)
+  const [goalsForm, setGoalsForm] = useState<NutritionGoals | null>(null)
+  const [showGoals, setShowGoals] = useState(false)
   const [water, setWater] = useState<WaterLog | null>(null)
   const [scans, setScans] = useState<MealScan[]>([])
-  const [eaten, setEaten] = useState<string[]>([])
   const [savingWater, setSavingWater] = useState(false)
+  const [savingGoals, setSavingGoals] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState('')
 
   const [sheetOpen, setSheetOpen] = useState(false)
@@ -48,15 +52,27 @@ export function DietaPage() {
   const [scanError, setScanError] = useState('')
   const [confirming, setConfirming] = useState(false)
   const [foodPickerOpen, setFoodPickerOpen] = useState(false)
+  const [manualOpen, setManualOpen] = useState(false)
   const [savingFood, setSavingFood] = useState(false)
 
   useEffect(() => {
     if (!profile) return
-    getMealPlanForUser(profile).then(setPlan)
-    getWaterLog(profile.uid).then(setWater)
-    listMealScans(profile.uid).then(setScans).catch(() => undefined)
-    getEatenMeals(profile.uid).then(setEaten).catch(() => undefined)
+    setLoading(true)
+    Promise.all([
+      getMealPlanForUser(profile).then(setPlan),
+      listMealScans(profile.uid).then(setScans),
+      getWaterLog(profile).then(setWater),
+    ])
+      .catch(() => undefined)
+      .finally(() => setLoading(false))
   }, [profile])
+
+  useEffect(() => {
+    if (!profile) return
+    const resolved = resolveNutritionGoals(profile, plan)
+    setGoals(resolved)
+    setGoalsForm(resolved)
+  }, [profile, plan])
 
   useEffect(() => {
     if (!toast) return
@@ -65,44 +81,34 @@ export function DietaPage() {
   }, [toast])
 
   const stats = useMemo(() => {
-    if (!plan) return null
-    const eatenMeals = plan.meals.filter((m) => eaten.includes(m.name))
-    const planCalories = eatenMeals.reduce((sum, m) => sum + m.calories, 0)
-    const scanCalories = scans.reduce((sum, s) => sum + s.calories, 0)
-    const totalCalories = planCalories + scanCalories
-    const goalCalories = plan.caloriesGoal
-    const remaining = Math.max(goalCalories - totalCalories, 0)
-    const calorieProgress = Math.min(Math.round((totalCalories / goalCalories) * 100), 100)
-    const overGoal = totalCalories > goalCalories
-    const mealsDone = eatenMeals.length
-    const mealsTotal = plan.meals.length
-    const nextMeal = plan.meals.find((m) => !eaten.includes(m.name)) ?? null
-
-    const planCalTotal = plan.meals.reduce((s, m) => s + m.calories, 0)
-    const eatenRatio = planCalTotal > 0 ? planCalories / planCalTotal : 0
-    const proteinExtra = scans.reduce((s, x) => s + x.protein, 0)
-    const carbsExtra = scans.reduce((s, x) => s + x.carbs, 0)
-    const fatExtra = scans.reduce((s, x) => s + x.fat, 0)
+    if (!goals) return null
+    const intake = scans.reduce((sum, s) => sum + s.calories, 0)
+    const protein = scans.reduce((sum, s) => sum + s.protein, 0)
+    const carbs = scans.reduce((sum, s) => sum + s.carbs, 0)
+    const fat = scans.reduce((sum, s) => sum + s.fat, 0)
+    const expenditure = goals.calorieExpenditure
+    const calorieGoal = goals.calorieGoal
+    const remaining = Math.max(calorieGoal - intake, 0)
+    const calorieProgress = Math.min(Math.round((intake / calorieGoal) * 100), 100)
+    const overGoal = intake > calorieGoal
+    const energyBalance = intake - expenditure
 
     return {
-      planCalories,
-      scanCalories,
-      totalCalories,
-      goalCalories,
+      intake,
+      protein,
+      carbs,
+      fat,
+      expenditure,
+      calorieGoal,
       remaining,
       calorieProgress,
       overGoal,
-      mealsDone,
-      mealsTotal,
-      nextMeal,
-      eatenRatio,
-      proteinExtra,
-      carbsExtra,
-      fatExtra,
+      energyBalance,
+      balanceLabel: energyBalanceLabel(intake, expenditure),
     }
-  }, [plan, eaten, scans])
+  }, [goals, scans])
 
-  if (!plan || !stats) {
+  if (!profile || loading || !stats || !goals) {
     return (
       <div className="flex items-center justify-center px-4 py-20 text-neutral-400">
         Carregando alimentação…
@@ -111,26 +117,36 @@ export function DietaPage() {
   }
 
   const waterLiters = water?.liters ?? 0
-  const waterGoal = water?.goalLiters ?? 3
-  const waterPct = Math.min(100, Math.round((waterLiters / Math.max(waterGoal, 0.1)) * 100))
-
-  async function toggleMeal(name: string) {
-    if (!profile) return
-    const next = await toggleEatenMeal(profile.uid, name)
-    setEaten(next)
-    const justAte = next.includes(name) && !eaten.includes(name)
-    if (justAte) setToast(`${name} marcada`)
-  }
+  const waterGoal = water?.goalLiters ?? goals.waterGoalLiters
 
   async function bumpWater(delta: number) {
     if (!profile || savingWater) return
     const next = Math.max(0, Math.min(waterGoal, Number((waterLiters + delta).toFixed(2))))
     setSavingWater(true)
     try {
-      const updated = await setWaterLiters(profile.uid, next)
+      const updated = await setWaterLiters(profile, next, todayKey(), waterGoal)
       setWater(updated)
     } finally {
       setSavingWater(false)
+    }
+  }
+
+  async function onSaveGoals(e: FormEvent) {
+    e.preventDefault()
+    if (!profile || !goalsForm) return
+    setSavingGoals(true)
+    try {
+      await saveNutritionGoals(profile.uid, goalsForm)
+      await refreshProfile()
+      setGoals(goalsForm)
+      setShowGoals(false)
+      setToast('Metas atualizadas')
+      const updatedWater = await getWaterLog({ ...profile, nutritionGoals: goalsForm })
+      setWater(updatedWater)
+    } catch (err) {
+      setToast(err instanceof Error ? err.message : 'Erro ao salvar metas')
+    } finally {
+      setSavingGoals(false)
     }
   }
 
@@ -150,36 +166,16 @@ export function DietaPage() {
       setPreviewUrl(compressed.previewUrl)
 
       let result: MealAnalysisResult
-      if (isDemo || !isFirebaseConfigured) {
+      try {
+        result = await analyzeMealPhotoRemote({
+          imageBase64: compressed.base64,
+          mimeType: compressed.mimeType,
+        })
+      } catch {
         if (hasGeminiBrowserKey()) {
-          result = await analyzeMealPhotoWithGeminiKey(
-            compressed.base64,
-            compressed.mimeType,
-          )
+          result = await analyzeMealPhotoWithGeminiKey(compressed.base64, compressed.mimeType)
         } else {
-          await new Promise((r) => setTimeout(r, 900))
-          result = mockMealAnalysis()
-        }
-      } else {
-        try {
-          result = await analyzeMealPhotoRemote({
-            imageBase64: compressed.base64,
-            mimeType: compressed.mimeType,
-          })
-        } catch {
-          if (hasGeminiBrowserKey()) {
-            result = await analyzeMealPhotoWithGeminiKey(
-              compressed.base64,
-              compressed.mimeType,
-            )
-          } else {
-            result = {
-              ...mockMealAnalysis(),
-              notes:
-                'IA no servidor ainda não liberada. Ajuste os valores ou adicione VITE_GEMINI_API_KEY.',
-              confidence: 0.2,
-            }
-          }
+          throw new Error('Análise indisponível. Configure a Cloud Function ou VITE_GEMINI_API_KEY.')
         }
       }
       setAnalysis(result)
@@ -196,6 +192,7 @@ export function DietaPage() {
     try {
       const saved = await saveMealScan({
         userId: profile.uid,
+        gymId: profile.gymId ?? '',
         date: todayKey(),
         title: analysis.title,
         calories: analysis.calories,
@@ -220,7 +217,7 @@ export function DietaPage() {
   }
 
   async function removeScan(id: string) {
-    await deleteMealScan(id, profile?.uid)
+    await deleteMealScan(id)
     setScans((prev) => prev.filter((s) => s.id !== id))
     setToast('Item removido')
   }
@@ -231,6 +228,7 @@ export function DietaPage() {
     try {
       const saved = await saveMealScan({
         userId: profile.uid,
+        gymId: profile.gymId ?? '',
         date: todayKey(),
         title: `${portion.food.name} (${portion.grams}g)`,
         calories: portion.calories,
@@ -255,11 +253,49 @@ export function DietaPage() {
     }
   }
 
+  async function addManualFood(entry: {
+    title: string
+    calories: number
+    protein: number
+    carbs: number
+    fat: number
+  }) {
+    if (!profile) return
+    setSavingFood(true)
+    try {
+      const saved = await saveMealScan({
+        userId: profile.uid,
+        gymId: profile.gymId ?? '',
+        date: todayKey(),
+        title: entry.title,
+        calories: entry.calories,
+        protein: entry.protein,
+        carbs: entry.carbs,
+        fat: entry.fat,
+        items: [entry.title],
+        confidence: 1,
+        notes: 'Registro manual',
+        previewUrl: null,
+      })
+      setScans((prev) => [saved, ...prev])
+      setManualOpen(false)
+      setToast(`+${entry.calories} kcal · ${entry.title}`)
+    } finally {
+      setSavingFood(false)
+    }
+  }
+
   const dateLabel = new Date().toLocaleDateString('pt-BR', {
     weekday: 'short',
     day: '2-digit',
     month: 'short',
   })
+
+  const macroCards = [
+    { label: 'Prot', current: stats.protein, goal: goals.proteinGoal, color: 'bg-blue-500' },
+    { label: 'Carb', current: stats.carbs, goal: goals.carbsGoal, color: 'bg-amber-500' },
+    { label: 'Gord', current: stats.fat, goal: goals.fatGoal, color: 'bg-rose-500' },
+  ]
 
   return (
     <>
@@ -267,20 +303,22 @@ export function DietaPage() {
         <header className="anim-rise flex items-end justify-between gap-3 pt-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-              {dateLabel} · {plan.name}
+              {dateLabel} · Diário livre
             </p>
             <h1 className="font-display mt-1 text-3xl font-extrabold tracking-tight">
               Alimentação
             </h1>
+            <p className="mt-1 text-sm text-neutral-400">
+              Registre o que comeu e compare com seu gasto calórico
+            </p>
           </div>
           <div className="rounded-2xl bg-brand/15 px-3 py-2 text-right">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-brand">Hoje</p>
-            <p className="font-display text-lg font-bold text-brand">{stats.totalCalories}</p>
+            <p className="font-display text-lg font-bold text-brand">{stats.intake}</p>
             <p className="text-[10px] text-neutral-400">kcal</p>
           </div>
         </header>
 
-        {/* Resumo do dia — primeiro o que importa */}
         <section className="anim-rise anim-rise-delay-1 glass-panel rounded-3xl p-5">
           <div className="flex items-center gap-4">
             <div className="relative flex h-28 w-28 shrink-0 items-center justify-center">
@@ -305,49 +343,51 @@ export function DietaPage() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm text-neutral-400">
-                {stats.overGoal ? 'Acima da meta' : 'Ainda pode comer'}
+                {stats.overGoal ? 'Acima da meta de consumo' : 'Ainda pode comer'}
               </p>
               <p className="font-display mt-0.5 text-2xl font-extrabold tracking-tight">
-                {stats.overGoal
-                  ? `+${stats.totalCalories - stats.goalCalories}`
-                  : stats.remaining}
+                {stats.overGoal ? `+${stats.intake - stats.calorieGoal}` : stats.remaining}
                 <span className="ml-1 text-sm font-semibold text-neutral-400">kcal</span>
               </p>
               <p className="mt-2 text-xs leading-relaxed text-neutral-500">
-                Meta {stats.goalCalories} · plano {stats.planCalories} · extras {stats.scanCalories}
+                Meta {stats.calorieGoal} kcal · consumido {stats.intake} kcal
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-surface-3/60 p-3">
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-neutral-500">Gasto estimado</p>
+              <p className="mt-1 text-lg font-bold">{stats.expenditure} kcal</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[10px] uppercase tracking-wider text-neutral-500">Saldo do dia</p>
+              <p
+                className={`mt-1 text-lg font-bold ${
+                  stats.energyBalance > 50
+                    ? 'text-amber-300'
+                    : stats.energyBalance < -50
+                      ? 'text-emerald-300'
+                      : 'text-neutral-200'
+                }`}
+              >
+                {stats.balanceLabel}
               </p>
             </div>
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-2">
-            {plan.macros.map((macro) => {
-              const fromPlan = Math.round(macro.goal * stats.eatenRatio * 0.7)
-              const extra = macro.label.toLowerCase().includes('prote')
-                ? stats.proteinExtra
-                : macro.label.toLowerCase().includes('carb')
-                  ? stats.carbsExtra
-                  : macro.label.toLowerCase().includes('gord')
-                    ? stats.fatExtra
-                    : 0
-              const current = fromPlan + extra
-              const pct = Math.min(Math.round((current / macro.goal) * 100), 100)
-              const short = macro.label.toLowerCase().includes('prote')
-                ? 'Prot'
-                : macro.label.toLowerCase().includes('carb')
-                  ? 'Carb'
-                  : 'Gord'
+            {macroCards.map((macro) => {
+              const pct = Math.min(Math.round((macro.current / macro.goal) * 100), 100)
               return (
                 <div key={macro.label} className="rounded-2xl bg-surface-3/80 p-3">
-                  <p className="text-[10px] uppercase tracking-wider text-neutral-500">{short}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-neutral-500">{macro.label}</p>
                   <p className="mt-1 text-sm font-bold">
-                    {current}
+                    {macro.current}
                     <span className="font-normal text-neutral-500">/{macro.goal}g</span>
                   </p>
                   <div className="mt-2 h-1 overflow-hidden rounded-full bg-black/30">
-                    <div
-                      className={`h-full rounded-full ${macro.color}`}
-                      style={{ width: `${pct}%` }}
-                    />
+                    <div className={`h-full rounded-full ${macro.color}`} style={{ width: `${pct}%` }} />
                   </div>
                 </div>
               )
@@ -355,35 +395,143 @@ export function DietaPage() {
           </div>
         </section>
 
-        {/* Ação principal: registrar */}
         <section className="anim-rise anim-rise-delay-2">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-            Registrar o que comeu
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+              Registrar o que comeu
+            </h2>
+            <button
+              type="button"
+              onClick={() => setShowGoals((v) => !v)}
+              className="text-xs font-semibold text-brand"
+            >
+              {showGoals ? 'Fechar metas' : 'Ajustar metas'}
+            </button>
+          </div>
+
+          {showGoals && goalsForm && (
+            <form
+              onSubmit={onSaveGoals}
+              className="mb-3 grid gap-3 rounded-2xl border border-brand/20 bg-brand/5 p-4 sm:grid-cols-2"
+            >
+              <p className="text-sm font-semibold text-neutral-200 sm:col-span-2">
+                Suas metas pessoais
+              </p>
+              <label className="text-xs text-neutral-400">
+                Meta de consumo (kcal/dia)
+                <input
+                  type="number"
+                  min={800}
+                  required
+                  value={goalsForm.calorieGoal}
+                  onChange={(e) =>
+                    setGoalsForm({ ...goalsForm, calorieGoal: Number(e.target.value) || 2000 })
+                  }
+                  className="mt-1 w-full rounded-xl bg-surface-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs text-neutral-400">
+                Gasto calórico estimado (kcal/dia)
+                <input
+                  type="number"
+                  min={800}
+                  required
+                  value={goalsForm.calorieExpenditure}
+                  onChange={(e) =>
+                    setGoalsForm({
+                      ...goalsForm,
+                      calorieExpenditure: Number(e.target.value) || 2200,
+                    })
+                  }
+                  className="mt-1 w-full rounded-xl bg-surface-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs text-neutral-400">
+                Proteína (g)
+                <input
+                  type="number"
+                  min={0}
+                  value={goalsForm.proteinGoal}
+                  onChange={(e) =>
+                    setGoalsForm({ ...goalsForm, proteinGoal: Number(e.target.value) || 0 })
+                  }
+                  className="mt-1 w-full rounded-xl bg-surface-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs text-neutral-400">
+                Carboidratos (g)
+                <input
+                  type="number"
+                  min={0}
+                  value={goalsForm.carbsGoal}
+                  onChange={(e) =>
+                    setGoalsForm({ ...goalsForm, carbsGoal: Number(e.target.value) || 0 })
+                  }
+                  className="mt-1 w-full rounded-xl bg-surface-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs text-neutral-400">
+                Gorduras (g)
+                <input
+                  type="number"
+                  min={0}
+                  value={goalsForm.fatGoal}
+                  onChange={(e) =>
+                    setGoalsForm({ ...goalsForm, fatGoal: Number(e.target.value) || 0 })
+                  }
+                  className="mt-1 w-full rounded-xl bg-surface-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="text-xs text-neutral-400">
+                Água (litros/dia)
+                <input
+                  type="number"
+                  min={1}
+                  step={0.5}
+                  value={goalsForm.waterGoalLiters}
+                  onChange={(e) =>
+                    setGoalsForm({
+                      ...goalsForm,
+                      waterGoalLiters: Number(e.target.value) || 3,
+                    })
+                  }
+                  className="mt-1 w-full rounded-xl bg-surface-3 px-3 py-2 text-sm"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={savingGoals}
+                className="rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-60 sm:col-span-2"
+              >
+                {savingGoals ? 'Salvando…' : 'Salvar metas'}
+              </button>
+            </form>
+          )}
+
+          <div className="grid grid-cols-3 gap-2">
             <button
               type="button"
               onClick={() => setFoodPickerOpen(true)}
-              className="pressable hero-checkin relative overflow-hidden rounded-3xl p-4 text-left"
+              className="pressable hero-checkin relative overflow-hidden rounded-2xl p-3 text-left"
             >
-              <div className="relative z-10">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">
-                  Mais fácil
-                </p>
-                <p className="mt-2 text-lg font-bold leading-tight text-white">Buscar alimento</p>
-                <p className="mt-1 text-xs text-white/75">Lista ou IA</p>
-              </div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/70">Buscar</p>
+              <p className="mt-1 text-sm font-bold leading-tight text-white">Alimento</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => setManualOpen(true)}
+              className="pressable glass-panel rounded-2xl border border-white/10 p-3 text-left"
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand">Manual</p>
+              <p className="mt-1 text-sm font-bold leading-tight">Digitar kcal</p>
             </button>
             <button
               type="button"
               onClick={openCamera}
-              className="pressable glass-panel rounded-3xl border border-white/10 p-4 text-left"
+              className="pressable glass-panel rounded-2xl border border-white/10 p-3 text-left"
             >
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand">
-                Com foto
-              </p>
-              <p className="mt-2 text-lg font-bold leading-tight">Fotografar prato</p>
-              <p className="mt-1 text-xs text-neutral-400">IA estima kcal</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-brand">Foto</p>
+              <p className="mt-1 text-sm font-bold leading-tight">IA estima</p>
             </button>
           </div>
         </section>
@@ -401,38 +549,10 @@ export function DietaPage() {
           }}
         />
 
-        {/* Próxima refeição do plano */}
-        {stats.nextMeal && (
-          <button
-            type="button"
-            onClick={() => void toggleMeal(stats.nextMeal!.name)}
-            className="pressable anim-rise anim-rise-delay-3 overflow-hidden rounded-3xl border border-brand/25 bg-gradient-to-br from-brand/20 to-transparent p-4 text-left"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-brand">
-                  Próxima do plano · {stats.nextMeal.time}
-                </p>
-                <p className="mt-1 text-lg font-bold">{stats.nextMeal.name}</p>
-                <p className="mt-1 text-xs text-neutral-400">
-                  {stats.nextMeal.items.slice(0, 3).join(' · ')}
-                  {stats.nextMeal.items.length > 3 ? '…' : ''}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-brand">{stats.nextMeal.calories}</p>
-                <p className="text-[10px] text-neutral-500">kcal</p>
-              </div>
-            </div>
-            <p className="mt-3 text-xs font-semibold text-brand">Toque para marcar como comida ✓</p>
-          </button>
-        )}
-
-        {/* Itens registrados fora do plano */}
         <section>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-              Adicionados hoje
+              Diário de hoje
             </h3>
             {scans.length > 0 && (
               <span className="text-xs text-neutral-500">{scans.length} item(ns)</span>
@@ -442,16 +562,13 @@ export function DietaPage() {
             <div className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-center">
               <p className="text-sm text-neutral-400">Nada registrado ainda</p>
               <p className="mt-1 text-xs text-neutral-500">
-                Use buscar ou foto acima, ou marque o plano abaixo
+                Busque um alimento, digite as calorias ou use uma foto
               </p>
             </div>
           ) : (
             <div className="flex flex-col gap-2">
               {scans.map((scan) => (
-                <div
-                  key={scan.id}
-                  className="glass-panel flex items-center gap-3 rounded-2xl p-3"
-                >
+                <div key={scan.id} className="glass-panel flex items-center gap-3 rounded-2xl p-3">
                   {scan.previewUrl ? (
                     <img
                       src={scan.previewUrl}
@@ -485,79 +602,24 @@ export function DietaPage() {
           )}
         </section>
 
-        {/* Plano alimentar */}
-        <section>
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-              Seu plano
-            </h3>
-            <span className="rounded-full bg-surface-3 px-2.5 py-1 text-[11px] font-semibold text-neutral-300">
-              {stats.mealsDone}/{stats.mealsTotal} feitas
-            </span>
-          </div>
-          <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-surface-3">
-            <div
-              className="h-full rounded-full bg-brand transition-[width] duration-400"
-              style={{
-                width: `${stats.mealsTotal ? (stats.mealsDone / stats.mealsTotal) * 100 : 0}%`,
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-2">
-            {plan.meals.map((meal) => {
-              const done = eaten.includes(meal.name)
-              return (
-                <button
-                  key={meal.name}
-                  type="button"
-                  onClick={() => void toggleMeal(meal.name)}
-                  className={`pressable flex items-start gap-3 rounded-2xl p-4 text-left transition-colors ${
-                    done
-                      ? 'border border-brand/30 bg-brand/10'
-                      : 'glass-panel'
-                  }`}
-                >
-                  <span
-                    className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${
-                      done
-                        ? 'border-brand bg-brand text-white'
-                        : 'border-neutral-600 text-transparent'
-                    }`}
-                  >
-                    ✓
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className={`font-semibold ${done ? 'text-brand-light' : ''}`}>
-                          {meal.name}
-                        </p>
-                        <p className="text-xs text-neutral-500">{meal.time}</p>
-                      </div>
-                      <span className="shrink-0 text-sm font-bold text-brand">
-                        {meal.calories} kcal
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs leading-relaxed text-neutral-400">
-                      {meal.items.join(' · ')}
-                    </p>
-                    <p className="mt-2 text-[11px] font-medium text-neutral-500">
-                      {done ? 'Comida — toque para desmarcar' : 'Toque se já comeu esta refeição'}
-                    </p>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
+        {plan && (
+          <section className="rounded-2xl border border-white/6 bg-surface-2/50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+              Sugestão da academia
+            </p>
+            <p className="mt-1 font-semibold text-neutral-300">{plan.name}</p>
+            <p className="mt-1 text-sm text-neutral-500">
+              Referência opcional — seu diário acima é o que conta para o dia.
+            </p>
+          </section>
+        )}
 
-        {/* Água */}
         <section className="glass-panel rounded-3xl p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="font-semibold">Água</p>
               <p className="text-sm text-neutral-400">
-                {waterLiters.toFixed(1).replace('.0', '')}L de {waterGoal}L · {waterPct}%
+                {waterLiters.toFixed(1).replace('.0', '')}L de {waterGoal}L
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -583,7 +645,9 @@ export function DietaPage() {
           <div className="mt-3 h-2 overflow-hidden rounded-full bg-surface-3">
             <div
               className="h-full rounded-full bg-sky-500 transition-[width] duration-300"
-              style={{ width: `${waterPct}%` }}
+              style={{
+                width: `${Math.min(100, Math.round((waterLiters / Math.max(waterGoal, 0.1)) * 100))}%`,
+              }}
             />
           </div>
         </section>
@@ -620,6 +684,13 @@ export function DietaPage() {
         confirming={savingFood}
         onClose={() => setFoodPickerOpen(false)}
         onConfirm={(portion) => void addFoodPortion(portion)}
+      />
+
+      <ManualFoodSheet
+        open={manualOpen}
+        confirming={savingFood}
+        onClose={() => setManualOpen(false)}
+        onConfirm={(entry) => void addManualFood(entry)}
       />
     </>
   )
