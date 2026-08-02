@@ -1,9 +1,30 @@
-export type GymThemeId = 'ember' | 'ocean' | 'forest' | 'violet' | 'crimson'
+export const gymThemeIds = [
+  'ember',
+  'ocean',
+  'forest',
+  'violet',
+  'crimson',
+  'sunset',
+  'mint',
+  'rose',
+  'indigo',
+  'lime',
+  'slate',
+  'coral',
+  'midnight',
+  'copper',
+  'magenta',
+  'cyan',
+  'wine',
+] as const
+
+export type GymThemeId = (typeof gymThemeIds)[number]
 
 export interface GymThemePreset {
   id: GymThemeId
   name: string
   description: string
+  group: string
   brand: string
   brandLight: string
   brandDark: string
@@ -17,87 +38,281 @@ export interface GymThemePreset {
   progressMid: string
 }
 
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '')
+  return {
+    r: parseInt(h.slice(0, 2), 16),
+    g: parseInt(h.slice(2, 4), 16),
+    b: parseInt(h.slice(4, 6), 16),
+  }
+}
+
+function rgba(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+function theme(
+  id: GymThemeId,
+  name: string,
+  description: string,
+  group: string,
+  brand: string,
+  brandLight: string,
+  brandDark: string,
+  heroFrom: string,
+  heroMid: string,
+  heroTo: string,
+  progressMid: string,
+): GymThemePreset {
+  return {
+    id,
+    name,
+    description,
+    group,
+    brand,
+    brandLight,
+    brandDark,
+    glow1: rgba(brand, 0.2),
+    glow2: rgba(brandLight, 0.12),
+    glow3: rgba(brand, 0.08),
+    heroFrom,
+    heroMid,
+    heroTo,
+    shellRing: rgba(brand, 0.06),
+    progressMid,
+  }
+}
+
+export const gymThemeGroups = [
+  { id: 'energia', label: 'Energia & impacto' },
+  { id: 'frio', label: 'Frio & foco' },
+  { id: 'natureza', label: 'Natureza & vitalidade' },
+  { id: 'premium', label: 'Premium & exclusivo' },
+] as const
+
 export const gymThemes: GymThemePreset[] = [
-  {
-    id: 'ember',
-    name: 'Brasa',
-    description: 'Laranja energético — identidade FitGym clássica',
-    brand: '#ff5a00',
-    brandLight: '#ff7a33',
-    brandDark: '#d94800',
-    glow1: 'rgba(255, 90, 0, 0.18)',
-    glow2: 'rgba(255, 140, 60, 0.1)',
-    glow3: 'rgba(255, 90, 0, 0.08)',
-    heroFrom: '#ff6a12',
-    heroMid: '#ff4d00',
-    heroTo: '#c73a00',
-    shellRing: 'rgba(255, 90, 0, 0.04)',
-    progressMid: '#ff9a4d',
-  },
-  {
-    id: 'ocean',
-    name: 'Oceano',
-    description: 'Azul claro — sensação de frescor e foco',
-    brand: '#0ea5e9',
-    brandLight: '#38bdf8',
-    brandDark: '#0284c7',
-    glow1: 'rgba(14, 165, 233, 0.2)',
-    glow2: 'rgba(56, 189, 248, 0.12)',
-    glow3: 'rgba(14, 165, 233, 0.08)',
-    heroFrom: '#38bdf8',
-    heroMid: '#0ea5e9',
-    heroTo: '#0369a1',
-    shellRing: 'rgba(14, 165, 233, 0.08)',
-    progressMid: '#7dd3fc',
-  },
-  {
-    id: 'forest',
-    name: 'Floresta',
-    description: 'Verde natural — equilíbrio e vitalidade',
-    brand: '#16a34a',
-    brandLight: '#4ade80',
-    brandDark: '#15803d',
-    glow1: 'rgba(22, 163, 74, 0.18)',
-    glow2: 'rgba(74, 222, 128, 0.1)',
-    glow3: 'rgba(22, 163, 74, 0.08)',
-    heroFrom: '#22c55e',
-    heroMid: '#16a34a',
-    heroTo: '#166534',
-    shellRing: 'rgba(22, 163, 74, 0.08)',
-    progressMid: '#86efac',
-  },
-  {
-    id: 'violet',
-    name: 'Violeta',
-    description: 'Roxo moderno — premium e diferenciado',
-    brand: '#7c3aed',
-    brandLight: '#a78bfa',
-    brandDark: '#6d28d9',
-    glow1: 'rgba(124, 58, 237, 0.2)',
-    glow2: 'rgba(167, 139, 250, 0.12)',
-    glow3: 'rgba(124, 58, 237, 0.08)',
-    heroFrom: '#8b5cf6',
-    heroMid: '#7c3aed',
-    heroTo: '#5b21b6',
-    shellRing: 'rgba(124, 58, 237, 0.08)',
-    progressMid: '#c4b5fd',
-  },
-  {
-    id: 'crimson',
-    name: 'Rubro',
-    description: 'Vermelho intenso — energia e impacto',
-    brand: '#dc2626',
-    brandLight: '#f87171',
-    brandDark: '#b91c1c',
-    glow1: 'rgba(220, 38, 38, 0.18)',
-    glow2: 'rgba(248, 113, 113, 0.1)',
-    glow3: 'rgba(220, 38, 38, 0.08)',
-    heroFrom: '#ef4444',
-    heroMid: '#dc2626',
-    heroTo: '#991b1b',
-    shellRing: 'rgba(220, 38, 38, 0.08)',
-    progressMid: '#fca5a5',
-  },
+  theme(
+    'ember',
+    'Brasa',
+    'Laranja energético — identidade FitGym clássica',
+    'energia',
+    '#ff5a00',
+    '#ff7a33',
+    '#d94800',
+    '#ff6a12',
+    '#ff4d00',
+    '#c73a00',
+    '#ff9a4d',
+  ),
+  theme(
+    'crimson',
+    'Rubro',
+    'Vermelho intenso — força e determinação',
+    'energia',
+    '#dc2626',
+    '#f87171',
+    '#b91c1c',
+    '#ef4444',
+    '#dc2626',
+    '#991b1b',
+    '#fca5a5',
+  ),
+  theme(
+    'sunset',
+    'Pôr do sol',
+    'Âmbar dourado — calor e motivação',
+    'energia',
+    '#f59e0b',
+    '#fbbf24',
+    '#d97706',
+    '#fbbf24',
+    '#f59e0b',
+    '#b45309',
+    '#fcd34d',
+  ),
+  theme(
+    'coral',
+    'Coral',
+    'Salmão vibrante — acolhedor e dinâmico',
+    'energia',
+    '#f97316',
+    '#fb923c',
+    '#ea580c',
+    '#fb923c',
+    '#f97316',
+    '#c2410c',
+    '#fdba74',
+  ),
+  theme(
+    'copper',
+    'Cobre',
+    'Bronze metálico — robustez e tradição',
+    'energia',
+    '#c27803',
+    '#eab308',
+    '#92400e',
+    '#d97706',
+    '#b45309',
+    '#78350f',
+    '#facc15',
+  ),
+  theme(
+    'ocean',
+    'Oceano',
+    'Azul claro — frescor e concentração',
+    'frio',
+    '#0ea5e9',
+    '#38bdf8',
+    '#0284c7',
+    '#38bdf8',
+    '#0ea5e9',
+    '#0369a1',
+    '#7dd3fc',
+  ),
+  theme(
+    'cyan',
+    'Ciano',
+    'Turquesa elétrico — moderno e ágil',
+    'frio',
+    '#06b6d4',
+    '#22d3ee',
+    '#0891b2',
+    '#22d3ee',
+    '#06b6d4',
+    '#0e7490',
+    '#67e8f9',
+  ),
+  theme(
+    'midnight',
+    'Meia-noite',
+    'Azul profundo — seriedade e performance',
+    'frio',
+    '#2563eb',
+    '#60a5fa',
+    '#1d4ed8',
+    '#3b82f6',
+    '#2563eb',
+    '#1e3a8a',
+    '#93c5fd',
+  ),
+  theme(
+    'indigo',
+    'Índigo',
+    'Azul-violeta — confiança e equilíbrio',
+    'frio',
+    '#4f46e5',
+    '#818cf8',
+    '#4338ca',
+    '#6366f1',
+    '#4f46e5',
+    '#3730a3',
+    '#a5b4fc',
+  ),
+  theme(
+    'slate',
+    'Grafite',
+    'Cinza-azulado — minimalista e corporativo',
+    'frio',
+    '#64748b',
+    '#94a3b8',
+    '#475569',
+    '#94a3b8',
+    '#64748b',
+    '#334155',
+    '#cbd5e1',
+  ),
+  theme(
+    'forest',
+    'Floresta',
+    'Verde natural — saúde e equilíbrio',
+    'natureza',
+    '#16a34a',
+    '#4ade80',
+    '#15803d',
+    '#22c55e',
+    '#16a34a',
+    '#166534',
+    '#86efac',
+  ),
+  theme(
+    'lime',
+    'Limão',
+    'Verde-limão — explosão de energia',
+    'natureza',
+    '#65a30d',
+    '#a3e635',
+    '#4d7c0f',
+    '#84cc16',
+    '#65a30d',
+    '#3f6212',
+    '#bef264',
+  ),
+  theme(
+    'mint',
+    'Menta',
+    'Verde-água suave — leveza e bem-estar',
+    'natureza',
+    '#14b8a6',
+    '#2dd4bf',
+    '#0f766e',
+    '#2dd4bf',
+    '#14b8a6',
+    '#115e59',
+    '#5eead4',
+  ),
+  theme(
+    'violet',
+    'Violeta',
+    'Roxo moderno — premium e diferenciado',
+    'premium',
+    '#7c3aed',
+    '#a78bfa',
+    '#6d28d9',
+    '#8b5cf6',
+    '#7c3aed',
+    '#5b21b6',
+    '#c4b5fd',
+  ),
+  theme(
+    'magenta',
+    'Magenta',
+    'Fúcsia ousado — destaque e personalidade',
+    'premium',
+    '#c026d3',
+    '#e879f9',
+    '#a21caf',
+    '#d946ef',
+    '#c026d3',
+    '#86198f',
+    '#f0abfc',
+  ),
+  theme(
+    'rose',
+    'Rosa',
+    'Rosa elegante — estilo e comunidade',
+    'premium',
+    '#e11d48',
+    '#fb7185',
+    '#be123c',
+    '#f43f5e',
+    '#e11d48',
+    '#9f1239',
+    '#fda4af',
+  ),
+  theme(
+    'wine',
+    'Vinho',
+    'Bordô sofisticado — exclusividade e foco',
+    'premium',
+    '#9f1239',
+    '#fb7185',
+    '#881337',
+    '#be123c',
+    '#9f1239',
+    '#4c0519',
+    '#fecdd3',
+  ),
 ]
 
 const themeMap = new Map(gymThemes.map((t) => [t.id, t]))
@@ -110,19 +325,23 @@ export function isGymThemeId(id: string): id is GymThemeId {
   return themeMap.has(id as GymThemeId)
 }
 
+export function themesByGroup(groupId: string): GymThemePreset[] {
+  return gymThemes.filter((t) => t.group === groupId)
+}
+
 export function applyGymTheme(id: GymThemeId | string | undefined | null): void {
-  const theme = getGymTheme(id)
+  const preset = getGymTheme(id)
   const root = document.documentElement
-  root.style.setProperty('--color-brand', theme.brand)
-  root.style.setProperty('--color-brand-light', theme.brandLight)
-  root.style.setProperty('--color-brand-dark', theme.brandDark)
-  root.style.setProperty('--theme-glow-1', theme.glow1)
-  root.style.setProperty('--theme-glow-2', theme.glow2)
-  root.style.setProperty('--theme-glow-3', theme.glow3)
-  root.style.setProperty('--theme-hero-from', theme.heroFrom)
-  root.style.setProperty('--theme-hero-mid', theme.heroMid)
-  root.style.setProperty('--theme-hero-to', theme.heroTo)
-  root.style.setProperty('--theme-shell-ring', theme.shellRing)
-  root.style.setProperty('--theme-progress-mid', theme.progressMid)
-  root.dataset.gymTheme = theme.id
+  root.style.setProperty('--color-brand', preset.brand)
+  root.style.setProperty('--color-brand-light', preset.brandLight)
+  root.style.setProperty('--color-brand-dark', preset.brandDark)
+  root.style.setProperty('--theme-glow-1', preset.glow1)
+  root.style.setProperty('--theme-glow-2', preset.glow2)
+  root.style.setProperty('--theme-glow-3', preset.glow3)
+  root.style.setProperty('--theme-hero-from', preset.heroFrom)
+  root.style.setProperty('--theme-hero-mid', preset.heroMid)
+  root.style.setProperty('--theme-hero-to', preset.heroTo)
+  root.style.setProperty('--theme-shell-ring', preset.shellRing)
+  root.style.setProperty('--theme-progress-mid', preset.progressMid)
+  root.dataset.gymTheme = preset.id
 }

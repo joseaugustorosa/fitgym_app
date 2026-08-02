@@ -4,7 +4,8 @@ export type UserRole = 'super_admin' | 'gym_admin' | 'professor' | 'aluno'
 
 export type GymStatus = 'active' | 'suspended'
 
-export type GymThemeId = 'ember' | 'ocean' | 'forest' | 'violet' | 'crimson'
+import type { GymThemeId } from '../lib/gymThemes'
+export type { GymThemeId }
 
 export type InviteStatus = 'pending' | 'redeemed' | 'expired'
 

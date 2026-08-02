@@ -1,9 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useGymTheme } from '../../contexts/GymThemeContext'
 import { ColorModePicker } from '../../components/ColorModeToggle'
 import { useColorMode } from '../../contexts/ColorModeContext'
-import { gymThemes, applyGymTheme } from '../../lib/gymThemes'
+import {
+  applyGymTheme,
+  getGymTheme,
+  gymThemeGroups,
+  gymThemes,
+  themesByGroup,
+} from '../../lib/gymThemes'
 import type { GymThemeId } from '../../types'
 
 export function AdminAparenciaPage() {
@@ -13,6 +19,8 @@ export function AdminAparenciaPage() {
   const [selected, setSelected] = useState<GymThemeId>(themeId)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+
+  const previewTheme = useMemo(() => getGymTheme(selected), [selected])
 
   useEffect(() => {
     setSelected(themeId)
@@ -56,8 +64,8 @@ export function AdminAparenciaPage() {
       <section>
         <h2 className="text-xl font-bold lg:text-2xl">Aparência do app</h2>
         <p className="mt-1 text-sm text-neutral-400">
-          Toque em um tema para aplicar imediatamente. Alunos e professores verão as novas cores ao
-          abrir o app.
+          {gymThemes.length} paletas disponíveis — toque para aplicar imediatamente aos alunos e
+          professores.
         </p>
       </section>
 
@@ -83,63 +91,76 @@ export function AdminAparenciaPage() {
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {gymThemes.map((theme) => {
-          const active = selected === theme.id
-          const isCurrent = themeId === theme.id
-          return (
-            <button
-              key={theme.id}
-              type="button"
-              disabled={loading || busy}
-              onClick={() => void onSelectTheme(theme.id)}
-              className={`pressable rounded-2xl border p-4 text-left transition-colors ${
-                active
-                  ? 'border-brand bg-brand/10 ring-2 ring-brand/40'
-                  : 'border-white/8 bg-surface-2 hover:bg-surface-3/80'
-              } ${busy && !active ? 'opacity-60' : ''}`}
-            >
-              <div className="flex gap-2">
-                <span
-                  className="h-10 w-10 shrink-0 rounded-xl shadow-inner"
-                  style={{ background: theme.brand }}
-                />
-                <span
-                  className="h-10 w-10 shrink-0 rounded-xl opacity-80"
-                  style={{ background: theme.brandLight }}
-                />
-                <span
-                  className="h-10 flex-1 rounded-xl opacity-50"
-                  style={{
-                    background: `linear-gradient(135deg, ${theme.glow1}, transparent)`,
-                  }}
-                />
-              </div>
-              <p className="mt-3 font-semibold">{theme.name}</p>
-              <p className="mt-1 text-xs leading-relaxed text-neutral-400">{theme.description}</p>
-              {isCurrent && (
-                <p className="mt-2 text-xs font-bold text-brand">Tema ativo</p>
-              )}
-              {active && busy && !isCurrent && (
-                <p className="mt-2 text-xs font-bold text-brand">Aplicando…</p>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      {gymThemeGroups.map((group) => {
+        const themes = themesByGroup(group.id)
+        if (themes.length === 0) return null
+        return (
+          <section key={group.id}>
+            <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
+              {group.label}
+            </h3>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {themes.map((theme) => {
+                const active = selected === theme.id
+                const isCurrent = themeId === theme.id
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    disabled={loading || busy}
+                    onClick={() => void onSelectTheme(theme.id)}
+                    className={`pressable rounded-2xl border p-4 text-left transition-colors ${
+                      active
+                        ? 'border-brand bg-brand/10 ring-2 ring-brand/40'
+                        : 'border-[var(--color-panel-border)] bg-surface-2 hover:bg-surface-3/80'
+                    } ${busy && !active ? 'opacity-60' : ''}`}
+                  >
+                    <div className="flex gap-2">
+                      <span
+                        className="h-10 w-10 shrink-0 rounded-xl shadow-inner"
+                        style={{ background: theme.brand }}
+                      />
+                      <span
+                        className="h-10 w-10 shrink-0 rounded-xl opacity-80"
+                        style={{ background: theme.brandLight }}
+                      />
+                      <span
+                        className="h-10 flex-1 rounded-xl opacity-50"
+                        style={{
+                          background: `linear-gradient(135deg, ${theme.heroFrom}, ${theme.heroTo})`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-3 font-semibold">{theme.name}</p>
+                    <p className="mt-1 text-xs leading-relaxed text-neutral-400">
+                      {theme.description}
+                    </p>
+                    {isCurrent && (
+                      <p className="mt-2 text-xs font-bold text-brand">Tema ativo</p>
+                    )}
+                    {active && busy && !isCurrent && (
+                      <p className="mt-2 text-xs font-bold text-brand">Aplicando…</p>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )
+      })}
 
-      <div className="rounded-2xl border border-white/8 bg-surface-2 p-4">
+      <div className="rounded-2xl border border-[var(--color-panel-border)] bg-surface-2 p-4">
         <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">Prévia</p>
         <div
           className="mt-3 overflow-hidden rounded-2xl p-4"
           style={{
-            background: `radial-gradient(ellipse at top, ${gymThemes.find((t) => t.id === selected)?.glow1}, transparent 70%), ${mode === 'light' ? '#f4f4f5' : '#090909'}`,
+            background: `radial-gradient(ellipse at top, ${previewTheme.glow1}, transparent 70%), ${mode === 'light' ? '#f4f4f5' : '#090909'}`,
           }}
         >
           <div
             className="rounded-2xl px-4 py-3 font-bold text-white"
             style={{
-              background: `linear-gradient(135deg, ${gymThemes.find((t) => t.id === selected)?.heroFrom}, ${gymThemes.find((t) => t.id === selected)?.heroTo})`,
+              background: `linear-gradient(135deg, ${previewTheme.heroFrom}, ${previewTheme.heroTo})`,
             }}
           >
             Check-in · Treino de hoje
@@ -147,10 +168,24 @@ export function AdminAparenciaPage() {
           <button
             type="button"
             className="mt-3 w-full rounded-xl py-2.5 text-sm font-bold text-white"
-            style={{ background: gymThemes.find((t) => t.id === selected)?.brand }}
+            style={{ background: previewTheme.brand }}
           >
             Botão principal
           </button>
+          <div className="mt-3 flex gap-2">
+            <span
+              className="h-8 flex-1 rounded-lg"
+              style={{ background: previewTheme.brandLight }}
+            />
+            <span
+              className="h-8 flex-1 rounded-lg"
+              style={{ background: previewTheme.progressMid }}
+            />
+            <span
+              className="h-8 flex-1 rounded-lg"
+              style={{ background: previewTheme.brandDark }}
+            />
+          </div>
         </div>
       </div>
     </div>
