@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "seed": "node scripts/seed.mjs"
+    "seed": "node scripts/seed.mjs",
+    "deploy:firebase": "npm run build --prefix functions && npx firebase-tools deploy --only firestore,functions"
   },
   "dependencies": {
     "firebase": "^11.10.0",

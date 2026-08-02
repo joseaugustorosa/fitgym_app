@@ -9,8 +9,8 @@ Baseado no protótipo em `academia_gym` (Sessão, Treino, Dieta, Comunidade), ag
 - React 19 + Vite + TypeScript + Tailwind CSS 4
 - Firebase Auth (e-mail/senha)
 - Cloud Firestore
-- Cloud Functions (`createStudent`)
-- Firebase Hosting
+- Cloud Functions (convites, análise de refeição)
+- **Vercel** (frontend em produção)
 
 ## Setup rápido
 
@@ -132,9 +132,12 @@ functions/         # createStudent
 scripts/seed.mjs   # Bootstrap
 ```
 
-## Deploy do frontend
+## Deploy
+
+**Frontend (Vercel)** — conecte o repositório GitHub na [Vercel](https://vercel.com). Cada push em `main` gera deploy automático. Configure as mesmas variáveis do `.env` (`VITE_FIREBASE_*`, opcional `VITE_GEMINI_API_KEY`) em *Project Settings → Environment Variables*.
+
+**Backend (Firebase)** — regras, índices e Cloud Functions:
 
 ```bash
-npm run build
-firebase deploy --only hosting
+npm run deploy:firebase
 ```
