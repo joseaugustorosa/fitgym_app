@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { ColorModeToggle } from './ColorModeToggle'
 import type { ReactNode } from 'react'
 
 export type StaffNavLink = {
@@ -24,7 +25,7 @@ function navClass(isActive: boolean, compact = false) {
   return `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors ${
     isActive
       ? 'bg-brand/15 text-brand'
-      : 'text-neutral-400 hover:bg-white/5 hover:text-neutral-200'
+      : 'text-neutral-400 hover:bg-[var(--color-hover-subtle)] hover:text-neutral-200'
   }`
 }
 
@@ -33,8 +34,8 @@ export function StaffLayoutShell({ badge, userName, links, actions }: StaffLayou
 
   return (
     <div className="staff-shell flex h-full w-full">
-      <aside className="staff-sidebar hidden w-64 shrink-0 flex-col border-r border-white/6 bg-surface-2/80 lg:flex">
-        <div className="border-b border-white/6 px-5 py-5">
+      <aside className="staff-sidebar hidden w-64 shrink-0 flex-col border-r border-[var(--color-panel-border)] bg-surface-2/80 lg:flex">
+        <div className="border-b border-[var(--color-panel-border)] px-5 py-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand font-display text-sm font-extrabold text-white">
               FG
@@ -61,7 +62,8 @@ export function StaffLayoutShell({ badge, userName, links, actions }: StaffLayou
           ))}
         </nav>
 
-        <div className="flex flex-col gap-2 border-t border-white/6 p-3">
+        <div className="flex flex-col gap-2 border-t border-[var(--color-panel-border)] p-3">
+          <ColorModeToggle compact />
           {actions}
           <button
             type="button"
@@ -74,12 +76,13 @@ export function StaffLayoutShell({ badge, userName, links, actions }: StaffLayou
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-white/6 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
+        <header className="flex items-center justify-between border-b border-[var(--color-panel-border)] px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden">
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-brand">{badge}</p>
             <h1 className="truncate font-display text-lg font-bold">{userName}</h1>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <ColorModeToggle compact />
             {actions}
             <button
               type="button"
@@ -91,15 +94,18 @@ export function StaffLayoutShell({ badge, userName, links, actions }: StaffLayou
           </div>
         </header>
 
-        <header className="hidden items-center justify-between border-b border-white/6 px-8 py-5 lg:flex">
+        <header className="hidden items-center justify-between border-b border-[var(--color-panel-border)] px-8 py-5 lg:flex">
           <div>
             <h1 className="font-display text-2xl font-bold tracking-tight">{badge}</h1>
             <p className="mt-0.5 text-sm text-neutral-400">Olá, {userName}</p>
           </div>
-          <div className="flex items-center gap-2">{actions}</div>
+          <div className="flex items-center gap-2">
+            <ColorModeToggle compact />
+            {actions}
+          </div>
         </header>
 
-        <nav className="scroll-area flex gap-1.5 overflow-x-auto border-b border-white/6 px-2 py-2.5 lg:hidden">
+        <nav className="scroll-area flex gap-1.5 overflow-x-auto border-b border-[var(--color-panel-border)] px-2 py-2.5 lg:hidden">
           {links.map((link) => (
             <NavLink
               key={link.to}

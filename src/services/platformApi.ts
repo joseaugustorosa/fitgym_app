@@ -15,6 +15,7 @@ import { httpsCallable } from 'firebase/functions'
 import { requireDb, requireFunctions, isFirebaseConfigured } from '../lib/firebase'
 import type { BillingStatus, Gym, GymBillingMonth, UserProfile } from '../types'
 import { normalizeRole } from '../lib/roles'
+import { isGymThemeId } from '../lib/gymThemes'
 import { mapNutritionGoals } from '../lib/nutrition'
 import { initialFromName } from '../lib/dates'
 
@@ -40,6 +41,7 @@ function mapGym(id: string, data: DocumentData): Gym {
     billingDay: data.billingDay ?? 1,
     status: data.status === 'suspended' ? 'suspended' : 'active',
     active: data.active !== false,
+    themeId: isGymThemeId(String(data.themeId)) ? data.themeId : 'ember',
     createdAt: toIso(data.createdAt),
   }
 }
@@ -60,6 +62,7 @@ function mapUser(id: string, data: DocumentData): UserProfile {
     lastCheckInAt: data.lastCheckInAt ? toIso(data.lastCheckInAt) : null,
     assignedWorkoutPlanId: data.assignedWorkoutPlanId ?? null,
     assignedMealPlanId: data.assignedMealPlanId ?? null,
+    activeWorkoutSessionId: data.activeWorkoutSessionId ?? null,
     nutritionGoals: mapNutritionGoals(data.nutritionGoals),
   }
 }
@@ -92,6 +95,7 @@ export async function createGym(input: {
     billingDay: Math.min(28, Math.max(1, input.billingDay)),
     status: 'active',
     active: true,
+    themeId: 'ember',
     createdAt: new Date().toISOString(),
   }
   await setDoc(ref, data)

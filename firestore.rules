@@ -55,21 +55,83 @@ service cloud.firestore {
       return isGymStaff() && sameGym(gymId);
     }
 
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data;
+    }
+
+    function studentInStaffGym(userId) {
+      return isGymStaff()
+        && exists(/databases/$(database)/documents/users/$(userId))
+        && userDoc(userId).gymId == userGymId();
+    }
+
+    function profileIdentityLocked() {
+      return request.resource.data.role == resource.data.role
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.gymId == resource.data.gymId;
+    }
+
+    function studentSelfFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name',
+        'avatarInitial',
+        'unit',
+        'branchId',
+        'nutritionGoals',
+        'activeWorkoutSessionId',
+        'lastCheckInAt',
+        'streakDays',
+      ]);
+    }
+
+    function staffStudentFields() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+        'name',
+        'avatarInitial',
+        'unit',
+        'branchId',
+        'active',
+        'assignedWorkoutPlanId',
+        'assignedMealPlanId',
+        'nutritionGoals',
+      ]);
+    }
+
+    function canReadStudentData(userId, docGymId) {
+      return resource.data.userId == request.auth.uid
+        || staffSameGym(docGymId)
+        || studentInStaffGym(userId)
+        || isSuperAdmin();
+    }
+
     match /users/{uid} {
       allow read: if isOwner(uid) || isSuperAdmin() || (isGymStaff() && resource.data.gymId == userGymId());
       allow create: if isSuperAdmin();
       allow update: if isSuperAdmin()
-        || (isGymStaff() && resource.data.gymId == userGymId() && resource.data.role == 'aluno')
-        || (isOwner(uid)
-          && request.resource.data.role == resource.data.role
-          && request.resource.data.email == resource.data.email
-          && request.resource.data.gymId == resource.data.gymId);
+        || (isOwner(uid) && profileIdentityLocked() && (role() != 'aluno' || studentSelfFields()))
+        || (isGymStaff()
+          && resource.data.gymId == userGymId()
+          && resource.data.role == 'aluno'
+          && request.resource.data.role == 'aluno'
+          && profileIdentityLocked()
+          && staffStudentFields());
       allow delete: if isSuperAdmin();
     }
 
     match /gyms/{gymId} {
       allow read: if isSuperAdmin() || sameGym(gymId);
-      allow write: if isSuperAdmin();
+      allow create: if isSuperAdmin();
+      allow update: if isSuperAdmin()
+        || (isGymAdmin() && sameGym(gymId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['themeId']))
+        || (isGymAdmin() && sameGym(gymId)
+          && request.resource.data.name == resource.data.name
+          && request.resource.data.contactEmail == resource.data.contactEmail
+          && request.resource.data.planAmount == resource.data.planAmount
+          && request.resource.data.billingDay == resource.data.billingDay
+          && request.resource.data.status == resource.data.status
+          && request.resource.data.active == resource.data.active);
+      allow delete: if isSuperAdmin();
     }
 
     match /gymBranches/{id} {
@@ -96,6 +158,7 @@ service cloud.firestore {
         || isSuperAdmin()
       );
       allow create: if signedIn()
+        && hasProfile()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.gymId == userGymId();
       allow update, delete: if isGymAdmin() || isSuperAdmin();
@@ -114,12 +177,12 @@ service cloud.firestore {
     }
 
     match /userWorkoutProgress/{id} {
-      allow read: if signedIn() && (
-        resource.data.userId == request.auth.uid
-        || staffSameGym(resource.data.gymId)
-        || isSuperAdmin()
+      allow read: if signedIn() && canReadStudentData(
+        resource.data.userId,
+        resource.data.gymId,
       );
       allow create, update: if signedIn()
+        && hasProfile()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.gymId == userGymId();
       allow delete: if isGymAdmin() || isOwner(resource.data.userId) || isSuperAdmin();
@@ -132,18 +195,20 @@ service cloud.firestore {
     }
 
     match /waterLogs/{id} {
-      allow read: if signedIn() && (
-        resource.data.userId == request.auth.uid
-        || staffSameGym(resource.data.gymId)
-        || isSuperAdmin()
+      allow read: if signedIn() && canReadStudentData(
+        resource.data.userId,
+        resource.data.gymId,
       );
-      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isGymAdmin() || isSuperAdmin();
+      allow create, update: if signedIn()
+        && hasProfile()
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isGymAdmin() || isSuperAdmin() || isOwner(resource.data.userId);
     }
 
     match /posts/{id} {
       allow read: if signedIn() && canReadGymData(resource.data.gymId);
       allow create: if signedIn()
+        && hasProfile()
         && request.resource.data.authorId == request.auth.uid
         && request.resource.data.gymId == userGymId();
       allow update: if (isGymAdmin() && sameGym(resource.data.gymId))
@@ -168,16 +233,17 @@ service cloud.firestore {
       allow update: if (isGymAdmin() && sameGym(resource.data.gymId))
         || (signedIn() && sameGym(resource.data.gymId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participants'])
-          && request.resource.data.participants == resource.data.participants + 1);
+          && request.resource.data.participants
+            == (resource.data.participants == null ? 0 : resource.data.participants) + 1);
     }
 
     match /mealScans/{id} {
-      allow read: if signedIn() && (
-        resource.data.userId == request.auth.uid
-        || staffSameGym(resource.data.gymId)
-        || isSuperAdmin()
+      allow read: if signedIn() && canReadStudentData(
+        resource.data.userId,
+        resource.data.gymId,
       );
       allow create: if signedIn()
+        && hasProfile()
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.gymId == userGymId();
       allow update, delete: if signedIn() && (
@@ -186,18 +252,21 @@ service cloud.firestore {
     }
 
     match /mealCompletions/{id} {
-      allow read: if signedIn() && (
-        resource.data.userId == request.auth.uid
-        || staffSameGym(resource.data.gymId)
-        || isSuperAdmin()
+      allow read: if signedIn() && canReadStudentData(
+        resource.data.userId,
+        resource.data.gymId,
       );
-      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isGymAdmin() || isSuperAdmin();
+      allow create, update: if signedIn()
+        && hasProfile()
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if isGymAdmin() || isSuperAdmin() || isOwner(resource.data.userId);
     }
 
     match /postComments/{id} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
+      allow create: if signedIn()
+        && hasProfile()
+        && request.resource.data.authorId == request.auth.uid;
       allow delete: if isGymAdmin() || (signedIn() && resource.data.authorId == request.auth.uid);
     }
 

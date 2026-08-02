@@ -7,6 +7,7 @@ import {
   SaladIcon,
 } from '../../components/icons'
 import { useAuth } from '../../contexts/AuthContext'
+import { ColorModeToggle } from '../../components/ColorModeToggle'
 import { isGymStaff } from '../../lib/roles'
 import {
   doCheckIn,
@@ -208,6 +209,7 @@ export function SessaoPage({ onNavigate }: SessaoPageProps) {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <ColorModeToggle compact />
           {isGymStaff(profile.role) && (
             <Link
               to="/admin"

@@ -11,6 +11,7 @@ const allLinks = [
   { to: '/admin/avaliacao', label: 'Avaliação', end: false, roles: ['gym_admin', 'professor'] as const },
   { to: '/admin/treinos', label: 'Programas', end: false, roles: ['gym_admin'] as const },
   { to: '/admin/filiais', label: 'Filiais', end: false, roles: ['gym_admin'] as const },
+  { to: '/admin/aparencia', label: 'Aparência', end: false, roles: ['gym_admin'] as const },
   { to: '/admin/dieta', label: 'Dieta', end: false, roles: ['gym_admin'] as const },
   { to: '/admin/comunidade', label: 'Comunidade', end: false, roles: ['gym_admin'] as const },
 ]
@@ -21,7 +22,7 @@ export function AdminShell() {
 
   const links = allLinks.filter((l) => {
     if (l.to === '/admin/comunidade' && !canModerateCommunity(role)) return false
-    if ((l.to === '/admin/treinos' || l.to === '/admin/dieta' || l.to === '/admin/filiais') && role !== 'gym_admin') return false
+    if ((l.to === '/admin/treinos' || l.to === '/admin/dieta' || l.to === '/admin/filiais' || l.to === '/admin/aparencia') && role !== 'gym_admin') return false
     return (l.roles as readonly UserRole[]).includes(role)
   })
 

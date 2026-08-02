@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { ColorModeProvider } from './contexts/ColorModeContext'
+import { GymThemeProvider } from './contexts/GymThemeContext'
 import { ProtectedRoute, GymStaffRoute } from './components/ProtectedRoute'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterPage } from './pages/auth/RegisterPage'
@@ -16,6 +18,7 @@ import { AdminComunidadePage } from './pages/admin/AdminComunidadePage'
 import { AdminAvaliacaoPage } from './pages/admin/AdminAvaliacaoPage'
 import { AdminTreinosAlunosPage } from './pages/admin/AdminTreinosAlunosPage'
 import { AdminFiliaisPage } from './pages/admin/AdminFiliaisPage'
+import { AdminAparenciaPage } from './pages/admin/AdminAparenciaPage'
 import { PlatformShell } from './pages/platform/PlatformShell'
 import { PlatformDashboardPage } from './pages/platform/PlatformDashboardPage'
 import { PlatformAcademiasPage } from './pages/platform/PlatformAcademiasPage'
@@ -24,6 +27,8 @@ import { PlatformMensalidadesPage } from './pages/platform/PlatformMensalidadesP
 export default function App() {
   return (
     <AuthProvider>
+      <ColorModeProvider>
+        <GymThemeProvider>
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -44,6 +49,7 @@ export default function App() {
               <Route path="treinos/:planId" element={<AdminTreinoPlanPage />} />
               <Route path="treinos/:planId/sessao/:sessionId" element={<AdminTreinoSessionPage />} />
               <Route path="filiais" element={<AdminFiliaisPage />} />
+              <Route path="aparencia" element={<AdminAparenciaPage />} />
               <Route path="dieta" element={<AdminDietaPage />} />
               <Route path="comunidade" element={<AdminComunidadePage />} />
             </Route>
@@ -60,6 +66,8 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
+        </GymThemeProvider>
+      </ColorModeProvider>
     </AuthProvider>
   )
 }

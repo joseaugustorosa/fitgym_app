@@ -137,6 +137,7 @@ async function ensureGym() {
       billingDay: 5,
       status: 'active',
       active: true,
+      themeId: 'ember',
       createdAt: FieldValue.serverTimestamp(),
     },
     { merge: true },

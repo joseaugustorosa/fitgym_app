@@ -21,10 +21,13 @@ import { todayKey, startOfWeek, initialFromName } from '../lib/dates'
 import { normalizeRole } from '../lib/roles'
 import { normalizeWorkoutPlan } from '../lib/workoutPlan'
 import { mapNutritionGoals, resolveNutritionGoals } from '../lib/nutrition'
+import { isGymThemeId } from '../lib/gymThemes'
 import type {
   Challenge,
   Exercise,
+  Gym,
   GymBranch,
+  GymThemeId,
   GymTip,
   Invite,
   MealAnalysisResult,
@@ -72,6 +75,7 @@ function mapUser(id: string, data: DocumentData): UserProfile {
     lastCheckInAt: data.lastCheckInAt ? toIso(data.lastCheckInAt) : null,
     assignedWorkoutPlanId: data.assignedWorkoutPlanId ?? null,
     assignedMealPlanId: data.assignedMealPlanId ?? null,
+    activeWorkoutSessionId: data.activeWorkoutSessionId ?? null,
     nutritionGoals: mapNutritionGoals(data.nutritionGoals),
   }
 }
@@ -119,6 +123,7 @@ export async function updateUserProfile(
       | 'active'
       | 'assignedWorkoutPlanId'
       | 'assignedMealPlanId'
+      | 'activeWorkoutSessionId'
       | 'nutritionGoals'
     >
   >,
@@ -131,6 +136,33 @@ export async function updateUserProfile(
 
 export async function saveNutritionGoals(uid: string, goals: NutritionGoals): Promise<void> {
   await updateUserProfile(uid, { nutritionGoals: goals })
+}
+
+function mapGym(id: string, data: DocumentData): Gym {
+  const rawTheme = data.themeId
+  return {
+    id,
+    name: data.name ?? '',
+    contactEmail: data.contactEmail ?? '',
+    planAmount: data.planAmount ?? 0,
+    billingDay: data.billingDay ?? 1,
+    status: data.status === 'suspended' ? 'suspended' : 'active',
+    active: data.active !== false,
+    themeId: isGymThemeId(String(rawTheme)) ? rawTheme : 'ember',
+    createdAt: toIso(data.createdAt),
+  }
+}
+
+export async function getGym(gymId: string): Promise<Gym | null> {
+  requireConfigured()
+  const snap = await getDoc(doc(requireDb(), 'gyms', gymId))
+  if (!snap.exists()) return null
+  return mapGym(snap.id, snap.data())
+}
+
+export async function updateGymTheme(gymId: string, themeId: GymThemeId): Promise<void> {
+  requireConfigured()
+  await updateDoc(doc(requireDb(), 'gyms', gymId), { themeId })
 }
 
 export async function listStudents(gymId: string): Promise<UserProfile[]> {
@@ -457,6 +489,10 @@ export async function toggleExerciseProgress(
     { merge: true },
   )
   return next
+}
+
+export async function setActiveWorkoutSession(uid: string, sessionId: string): Promise<void> {
+  await updateUserProfile(uid, { activeWorkoutSessionId: sessionId })
 }
 
 export async function getEatenMeals(userId: string, date = todayKey()): Promise<string[]> {

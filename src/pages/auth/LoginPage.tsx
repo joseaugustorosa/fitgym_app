@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { ColorModeToggle } from '../../components/ColorModeToggle'
 import { useAuth, homeRoute } from '../../contexts/AuthContext'
 
 export function LoginPage() {
@@ -30,6 +31,9 @@ export function LoginPage() {
 
   return (
     <div className="relative mx-auto flex h-full max-w-[430px] flex-col justify-end overflow-hidden px-6 pb-10 pt-16">
+      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))] z-10">
+        <ColorModeToggle compact />
+      </div>
       <div
         className="pointer-events-none absolute inset-0 opacity-40"
         style={{

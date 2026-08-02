@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { Exercise } from '../types'
 import { CloseIcon } from './icons'
 
@@ -29,12 +30,12 @@ export function ExercisePreviewSheet({ exercise, onClose }: ExercisePreviewSheet
     }
   }, [exercise])
 
-  return (
+  if (!open) return null
+
+  return createPortal(
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${
-          open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className="fixed inset-0 z-[210] bg-black/70 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden={!open}
       />
@@ -43,7 +44,7 @@ export function ExercisePreviewSheet({ exercise, onClose }: ExercisePreviewSheet
         role="dialog"
         aria-modal="true"
         aria-label={exercise ? `Demonstração: ${exercise.name}` : undefined}
-        className={`fixed inset-x-0 bottom-0 z-50 mx-auto max-w-[430px] transition-transform duration-300 ease-out ${
+        className={`fixed inset-x-0 bottom-0 z-[211] mx-auto max-w-[430px] transition-transform duration-300 ease-out ${
           open ? 'translate-y-0' : 'translate-y-full'
         }`}
       >
@@ -110,6 +111,7 @@ export function ExercisePreviewSheet({ exercise, onClose }: ExercisePreviewSheet
           )}
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   )
 }

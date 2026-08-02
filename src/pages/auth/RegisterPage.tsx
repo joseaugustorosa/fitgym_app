@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { ColorModeToggle } from '../../components/ColorModeToggle'
 import { signInWithEmailAndPassword } from 'firebase/auth'
 import { auth, isFirebaseConfigured } from '../../lib/firebase'
 import { getInvite, redeemInviteRemote } from '../../services/api'
@@ -61,7 +62,10 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-[430px] flex-col justify-center px-6 py-10">
+    <div className="relative mx-auto flex h-full max-w-[430px] flex-col justify-center px-6 py-10">
+      <div className="absolute right-4 top-[max(1rem,env(safe-area-inset-top))]">
+        <ColorModeToggle compact />
+      </div>
       <div className="glass-panel rounded-3xl p-6">
         <h1 className="font-display text-2xl font-bold">Criar conta</h1>
         <p className="mt-2 text-sm text-neutral-400">Complete seu cadastro com o convite da academia.</p>

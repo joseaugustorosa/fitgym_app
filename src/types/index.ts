@@ -4,6 +4,8 @@ export type UserRole = 'super_admin' | 'gym_admin' | 'professor' | 'aluno'
 
 export type GymStatus = 'active' | 'suspended'
 
+export type GymThemeId = 'ember' | 'ocean' | 'forest' | 'violet' | 'crimson'
+
 export type InviteStatus = 'pending' | 'redeemed' | 'expired'
 
 export type BillingStatus = 'paid' | 'pending' | 'overdue'
@@ -22,6 +24,7 @@ export interface Gym {
   billingDay: number
   status: GymStatus
   active: boolean
+  themeId: GymThemeId
   createdAt: string
 }
 
@@ -85,6 +88,7 @@ export interface UserProfile {
   lastCheckInAt: string | null
   assignedWorkoutPlanId: string | null
   assignedMealPlanId: string | null
+  activeWorkoutSessionId: string | null
   nutritionGoals: NutritionGoals | null
 }
 

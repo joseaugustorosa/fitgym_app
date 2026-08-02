@@ -17,7 +17,7 @@ export function BottomNav({ active, onChange }: BottomNavProps) {
   const activeIndex = Math.max(0, tabs.findIndex((t) => t.id === active))
 
   return (
-    <nav className="shrink-0 border-t border-white/6 bg-black/55 backdrop-blur-2xl pb-[env(safe-area-inset-bottom)]">
+    <nav className="bottom-nav shrink-0 pb-[env(safe-area-inset-bottom)] backdrop-blur-2xl">
       <div className="relative flex items-stretch justify-around px-2 pt-2">
         <div
           className="nav-indicator pointer-events-none absolute top-1.5 h-1 w-10 rounded-full bg-brand"

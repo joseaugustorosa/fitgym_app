@@ -1,33 +1,40 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PlayIcon } from '../../components/icons'
 import { ExercisePreviewSheet } from '../../components/ExercisePreviewSheet'
+import { WorkoutPlayer } from '../../components/WorkoutPlayer'
 import { useAuth } from '../../contexts/AuthContext'
 import {
+  doCheckIn,
   getWorkoutProgress,
   listExercises,
   listWorkoutPlans,
+  setActiveWorkoutSession,
   toggleExerciseProgress,
 } from '../../services/api'
+import { parseSets } from '../../lib/workoutSession'
+import { todayKey } from '../../lib/dates'
 import {
+  getNextSession,
   getSessionExercises,
   normalizeWorkoutPlan,
+  pickActiveSession,
   sessionChipSubtitle,
 } from '../../lib/workoutPlan'
 import type { Exercise, WorkoutPlan, WorkoutSession } from '../../types'
 
 export function TreinoPage() {
-  const { profile } = useAuth()
-  const listRef = useRef<HTMLDivElement>(null)
+  const { profile, setProfile } = useAuth()
   const [exercises, setExercises] = useState<Exercise[]>([])
   const [plan, setPlan] = useState<WorkoutPlan | null>(null)
   const [activeSession, setActiveSession] = useState<WorkoutSession | null>(null)
   const [checkedExercises, setCheckedExercises] = useState<Set<string>>(new Set())
   const [sessionProgress, setSessionProgress] = useState<Record<string, number>>({})
   const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null)
+  const [playerOpen, setPlayerOpen] = useState(false)
+  const [checkInDone, setCheckInDone] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [sessionActive, setSessionActive] = useState(false)
-  const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const completingRef = useRef<string | null>(null)
 
   const normalized = useMemo(
     () => (plan ? normalizeWorkoutPlan(plan) : null),
@@ -36,31 +43,49 @@ export function TreinoPage() {
 
   useEffect(() => {
     if (!profile?.gymId) return
+    let cancelled = false
     setLoading(true)
+
     Promise.all([listExercises(profile.gymId), listWorkoutPlans(profile.gymId)])
-      .then(([exs, pls]) => {
+      .then(async ([exs, pls]) => {
+        if (cancelled) return
         setExercises(exs)
         const assigned = profile.assignedWorkoutPlanId
           ? pls.find((p) => p.id === profile.assignedWorkoutPlanId) ?? null
           : null
         const nextPlan = assigned ? normalizeWorkoutPlan(assigned) : null
         setPlan(nextPlan)
-        setActiveSession(nextPlan?.sessions[0] ?? null)
-      })
-      .finally(() => setLoading(false))
-  }, [profile])
 
-  useEffect(() => {
-    if (!profile || !normalized) return
-    Promise.all(
-      normalized.sessions.map(async (session) => {
-        const progress = await getWorkoutProgress(profile.uid, session.id)
-        const done = progress?.completedExerciseIds.length ?? 0
-        const total = session.exerciseIds.length
-        return [session.id, total > 0 ? Math.round((done / total) * 100) : 0] as const
-      }),
-    ).then((entries) => setSessionProgress(Object.fromEntries(entries)))
-  }, [profile, normalized])
+        if (!nextPlan) {
+          setActiveSession(null)
+          setSessionProgress({})
+          return
+        }
+
+        const progressEntries = await Promise.all(
+          nextPlan.sessions.map(async (session) => {
+            const progress = await getWorkoutProgress(profile.uid, session.id)
+            const done = progress?.completedExerciseIds.length ?? 0
+            const total = session.exerciseIds.length
+            return [session.id, total > 0 ? Math.round((done / total) * 100) : 0] as const
+          }),
+        )
+        if (cancelled) return
+
+        const progressMap = Object.fromEntries(progressEntries)
+        setSessionProgress(progressMap)
+        setActiveSession(
+          pickActiveSession(nextPlan, progressMap, profile.activeWorkoutSessionId ?? null),
+        )
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [profile])
 
   useEffect(() => {
     if (!profile || !activeSession) return
@@ -77,8 +102,7 @@ export function TreinoPage() {
   const doneInSession = sessionExercises.filter((e) => checkedExercises.has(e.id)).length
   const progress =
     sessionExercises.length === 0 ? 0 : Math.round((doneInSession / sessionExercises.length) * 100)
-
-  const nextExercise = sessionExercises.find((e) => !checkedExercises.has(e.id)) ?? null
+  const allDone = sessionExercises.length > 0 && doneInSession === sessionExercises.length
 
   async function refreshSessionProgress(sessionId: string, done: number, total: number) {
     setSessionProgress((prev) => ({
@@ -87,36 +111,70 @@ export function TreinoPage() {
     }))
   }
 
-  async function toggleExercise(id: string) {
-    if (!profile || !plan || !activeSession || saving) return
+  const handleWorkoutSessionComplete = useCallback(async () => {
+    if (!profile || !plan || !activeSession || !normalized) return
+
+    const key = `${todayKey()}_${activeSession.id}`
+    if (completingRef.current === key) return
+    completingRef.current = key
+
+    const total = sessionExercises.length
+    setCheckedExercises(new Set(sessionExercises.map((e) => e.id)))
+    await refreshSessionProgress(activeSession.id, total, total)
+
+    try {
+      const updated = await doCheckIn(profile)
+      const next = getNextSession(normalized, activeSession.id)
+      await setActiveWorkoutSession(profile.uid, next.id)
+      setProfile({ ...updated, activeWorkoutSessionId: next.id })
+      setCheckInDone(true)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      if (msg.includes('já fez check-in')) {
+        const next = getNextSession(normalized, activeSession.id)
+        await setActiveWorkoutSession(profile.uid, next.id)
+        setProfile({ ...profile, activeWorkoutSessionId: next.id })
+        setCheckInDone(true)
+      }
+    }
+  }, [profile, plan, activeSession, normalized, sessionExercises, setProfile])
+
+  async function markExerciseDone(id: string): Promise<string[]> {
+    if (!profile || !plan || !activeSession) return Array.from(checkedExercises)
+    if (checkedExercises.has(id)) return Array.from(checkedExercises)
     setSaving(true)
-    setMessage('')
     try {
       const next = await toggleExerciseProgress(profile, plan.id, activeSession.id, id)
       setCheckedExercises(new Set(next))
       await refreshSessionProgress(activeSession.id, next.length, sessionExercises.length)
       if (next.length === sessionExercises.length && sessionExercises.length > 0) {
-        setMessage(`${activeSession.label} concluído! Bom trabalho.`)
-        setSessionActive(false)
+        void handleWorkoutSessionComplete()
       }
-    } catch (err) {
-      setMessage(err instanceof Error ? err.message : 'Não foi possível salvar o progresso')
+      return next
     } finally {
       setSaving(false)
     }
   }
 
-  function startSession() {
-    setSessionActive(true)
-    setMessage(nextExercise ? `Comece por: ${nextExercise.name}` : 'Todos os exercícios já foram feitos')
-    listRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    if (nextExercise) setPreviewExercise(nextExercise)
+  async function toggleExercise(id: string) {
+    if (!profile || !plan || !activeSession || saving || playerOpen) return
+    setSaving(true)
+    try {
+      const next = await toggleExerciseProgress(profile, plan.id, activeSession.id, id)
+      setCheckedExercises(new Set(next))
+      await refreshSessionProgress(activeSession.id, next.length, sessionExercises.length)
+      if (next.length === sessionExercises.length && sessionExercises.length > 0) {
+        void handleWorkoutSessionComplete()
+      }
+    } finally {
+      setSaving(false)
+    }
   }
 
   function selectSession(session: WorkoutSession) {
+    if (playerOpen) return
     setActiveSession(session)
-    setSessionActive(false)
-    setMessage('')
+    setCheckInDone(false)
   }
 
   if (loading) {
@@ -136,7 +194,7 @@ export function TreinoPage() {
 
   return (
     <>
-      <div className="flex flex-col gap-5 px-4 pb-6">
+      <div className="flex flex-col gap-5 px-4 pb-8">
         <header className="pt-3">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand">
             {normalized.name}
@@ -153,9 +211,7 @@ export function TreinoPage() {
 
         <section>
           <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-            {normalized.sessions.length === 1
-              ? 'Seu dia de treino'
-              : `${normalized.sessions.length} dias de treino`}
+            Escolha o dia
           </h3>
           <div className="scroll-area -mx-4 flex gap-2 overflow-x-auto px-4 pb-1">
             {normalized.sessions.map((session) => {
@@ -167,9 +223,10 @@ export function TreinoPage() {
                   key={session.id}
                   type="button"
                   onClick={() => selectSession(session)}
+                  disabled={playerOpen}
                   className={`relative shrink-0 rounded-xl px-4 py-3 text-left transition-colors ${
                     selected ? 'bg-brand text-white' : 'glass-panel text-neutral-300'
-                  }`}
+                  } ${playerOpen ? 'opacity-50' : ''}`}
                 >
                   {complete && (
                     <span
@@ -184,8 +241,10 @@ export function TreinoPage() {
                   <p className={`mt-0.5 text-xs ${selected ? 'text-white/85' : 'text-neutral-500'}`}>
                     {session.subtitle || session.muscleFocus}
                   </p>
-                  <p className={`mt-1 text-[11px] font-semibold ${selected ? 'text-white/75' : 'text-neutral-600'}`}>
-                    {session.exerciseIds.length} exercício{session.exerciseIds.length !== 1 ? 's' : ''}
+                  <p
+                    className={`mt-1 text-[11px] font-semibold ${selected ? 'text-white/75' : 'text-neutral-600'}`}
+                  >
+                    {session.exerciseIds.length} exerc.
                     {dayPct > 0 ? ` · ${dayPct}%` : ''}
                   </p>
                 </button>
@@ -196,6 +255,17 @@ export function TreinoPage() {
 
         {activeSession && (
           <>
+            {allDone && (
+              <div className="rounded-2xl border border-brand/30 bg-brand/10 px-4 py-3 text-center">
+                <p className="text-sm font-bold text-brand-light">
+                  {activeSession.label} concluído — 100%
+                </p>
+                {(checkInDone || profile?.lastCheckInAt) && (
+                  <p className="mt-1 text-xs text-neutral-400">Check-in de hoje registrado ✓</p>
+                )}
+              </div>
+            )}
+
             <section className="glass-panel rounded-3xl p-4">
               <div className="mb-1 flex items-center justify-between gap-2">
                 <span className="text-sm font-medium">{activeSession.label}</span>
@@ -211,86 +281,68 @@ export function TreinoPage() {
                 />
               </div>
               <button
-                onClick={startSession}
+                type="button"
+                onClick={() => {
+                  setCheckInDone(false)
+                  setPlayerOpen(true)
+                }}
                 disabled={sessionExercises.length === 0}
-                className="pressable mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-3.5 font-bold text-white disabled:opacity-50"
+                className="pressable mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-brand py-4 font-bold text-white disabled:opacity-50"
               >
                 <PlayIcon className="h-5 w-5" />
-                {sessionActive
-                  ? nextExercise
-                    ? `Continuar ${activeSession.label}`
-                    : `${activeSession.label} completo`
+                {allDone
+                  ? 'Treino concluído — refazer'
                   : progress > 0
-                    ? `Retomar ${activeSession.label}`
+                    ? `Continuar ${activeSession.label}`
                     : `Iniciar ${activeSession.label}`}
               </button>
-              {message && <p className="mt-2 text-center text-xs text-brand">{message}</p>}
-              {sessionActive && nextExercise && (
-                <p className="mt-2 text-center text-xs text-neutral-400">
-                  Próximo: <span className="font-semibold text-white">{nextExercise.name}</span>
-                </p>
-              )}
+              <p className="mt-2 text-center text-xs text-neutral-500">
+                Modo guiado · séries, descanso e próximo exercício automáticos
+              </p>
             </section>
 
-            <section ref={listRef}>
+            <section>
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-neutral-500">
-                Exercícios · {activeSession.label}
+                Exercícios
               </h3>
               <div className="flex flex-col gap-2">
                 {sessionExercises.length === 0 && (
                   <p className="rounded-xl bg-surface-2 p-4 text-sm text-neutral-400">
-                    Nenhum exercício neste dia ainda. Peça ao professor para montar {activeSession.label}.
+                    Nenhum exercício neste dia ainda.
                   </p>
                 )}
                 {sessionExercises.map((exercise, index) => {
                   const done = checkedExercises.has(exercise.id)
-                  const isNext = sessionActive && nextExercise?.id === exercise.id
+                  const { count, repsLabel } = parseSets(exercise.sets)
                   return (
                     <div
                       key={exercise.id}
-                      className={`flex items-center gap-3 rounded-xl p-3 transition-colors ${
-                        done
-                          ? 'border border-brand/30 bg-brand/10'
-                          : isNext
-                            ? 'border border-brand bg-surface-2'
-                            : 'bg-surface-2'
+                      className={`flex items-center gap-3 rounded-xl p-3 ${
+                        done ? 'border border-brand/30 bg-brand/10' : 'bg-surface-2'
                       }`}
                     >
                       <button
-                        onClick={() => toggleExercise(exercise.id)}
-                        aria-label={done ? 'Desmarcar exercício' : 'Marcar exercício como feito'}
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition-colors ${
-                          done
-                            ? 'border-brand bg-brand text-white'
-                            : 'border-neutral-600 text-neutral-500'
+                        type="button"
+                        onClick={() => void toggleExercise(exercise.id)}
+                        disabled={playerOpen || saving}
+                        aria-label={done ? 'Desmarcar' : 'Marcar feito'}
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
+                          done ? 'border-brand bg-brand text-white' : 'border-neutral-600 text-neutral-500'
                         }`}
                       >
                         {done ? '✓' : index + 1}
                       </button>
-
                       <button
+                        type="button"
                         onClick={() => setPreviewExercise(exercise)}
-                        className="flex min-w-0 flex-1 items-center gap-3 text-left active:opacity-80"
+                        className="min-w-0 flex-1 text-left active:opacity-80"
                       >
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate font-semibold ${done ? 'text-brand-light' : ''}`}>
-                            {exercise.name}
-                          </p>
-                          <p className="text-sm text-neutral-400">
-                            {exercise.sets} · Descanso {exercise.rest}
-                          </p>
-                        </div>
-
-                        <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-surface-3">
-                          {exercise.posterUrl ? (
-                            <img src={exercise.posterUrl} alt="" className="h-full w-full object-cover" />
-                          ) : null}
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/40">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand/90 text-white">
-                              <PlayIcon className="ml-0.5 h-4 w-4" />
-                            </div>
-                          </div>
-                        </div>
+                        <p className={`truncate font-semibold ${done ? 'text-brand-light' : ''}`}>
+                          {exercise.name}
+                        </p>
+                        <p className="text-sm text-neutral-400">
+                          {count}×{repsLabel} · descanso {exercise.rest}
+                        </p>
                       </button>
                     </div>
                   )
@@ -300,6 +352,19 @@ export function TreinoPage() {
           </>
         )}
       </div>
+
+      {activeSession && (
+        <WorkoutPlayer
+          open={playerOpen}
+          session={activeSession}
+          exercises={sessionExercises}
+          completedIds={checkedExercises}
+          saving={saving}
+          onClose={() => setPlayerOpen(false)}
+          onExerciseDone={markExerciseDone}
+          onSessionComplete={handleWorkoutSessionComplete}
+        />
+      )}
 
       <ExercisePreviewSheet exercise={previewExercise} onClose={() => setPreviewExercise(null)} />
     </>

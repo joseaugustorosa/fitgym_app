@@ -86,6 +86,42 @@ export function planSessionsLine(plan: WorkoutPlan): string {
   return p.sessions.map((s) => s.label).join(' · ')
 }
 
+export function getNextSession(plan: WorkoutPlan, currentSessionId: string): WorkoutSession {
+  const sessions = normalizeWorkoutPlan(plan).sessions
+  if (sessions.length === 0) {
+    throw new Error('Plano sem sessões')
+  }
+  const idx = sessions.findIndex((s) => s.id === currentSessionId)
+  if (idx < 0) return sessions[0]
+  return sessions[(idx + 1) % sessions.length]
+}
+
+/** Escolhe o dia de treino ativo: concluído hoje, ponteiro salvo ou primeiro pendente. */
+export function pickActiveSession(
+  plan: WorkoutPlan,
+  progressMap: Record<string, number>,
+  activeWorkoutSessionId: string | null,
+): WorkoutSession {
+  const sessions = normalizeWorkoutPlan(plan).sessions
+  if (sessions.length === 0) {
+    throw new Error('Plano sem sessões')
+  }
+
+  const completedToday = sessions.filter(
+    (s) => s.exerciseIds.length > 0 && (progressMap[s.id] ?? 0) >= 100,
+  )
+  if (completedToday.length > 0) {
+    return completedToday.sort((a, b) => b.order - a.order)[0]
+  }
+
+  if (activeWorkoutSessionId) {
+    const found = sessions.find((s) => s.id === activeWorkoutSessionId)
+    if (found) return found
+  }
+
+  return sessions.find((s) => (progressMap[s.id] ?? 0) < 100) ?? sessions[0]
+}
+
 export function sessionChipSubtitle(session: WorkoutSession): string {
   const parts = [session.subtitle].filter(Boolean)
   if (session.exerciseIds.length > 0) {
